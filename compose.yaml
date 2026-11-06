@@ -1,0 +1,31 @@
+# Environnement de dev du front mobile.
+#   docker compose up -d                       → mock d'API (Prism, port 4010)
+#   docker compose run --rm android ./gradlew assembleDebug   → build dans l'image SDK
+name: pawrise-mobile
+
+services:
+  mock-api:
+    # Mock de l'API à partir du contrat OpenAPI (api/openapi.yaml) : renvoie les `example` du contrat.
+    # Depuis l'app : adb reverse tcp:4010 tcp:4010, puis http://localhost:4010/
+    image: stoplight/prism:5.15.10
+    # -m false : le mode multiprocessus de Prism 5.15 plante au démarrage (cluster.isPrimary).
+    command: mock -h 0.0.0.0 -m false /api/openapi.yaml
+    ports:
+      - "4010:4010"
+    volumes:
+      - ./api:/api:ro
+
+  android:
+    build:
+      context: .
+      dockerfile: docker/android-sdk.Dockerfile
+    image: pawrise/android-sdk:37
+    profiles: ["build"]
+    volumes:
+      - ./:/workspace
+      - gradle-cache:/home/builder/.gradle
+    working_dir: /workspace/android
+    command: ./gradlew assembleDebug
+
+volumes:
+  gradle-cache:

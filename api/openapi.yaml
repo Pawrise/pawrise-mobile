@@ -1,0 +1,22 @@
+# Contrat d'interface de l'API Pawrise vu par l'app mobile.
+# PROVISOIRE : seul /health existe. À remplacer par le contrat de l'équipe backend
+# (inscription, connexion, refresh, profil chien, activation du collier).
+openapi: 3.1.0
+info:
+  title: Pawrise API (mock mobile)
+  version: 0.0.1
+paths:
+  /health:
+    get:
+      summary: Vérifie que le mock répond
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok

@@ -1,9 +1,32 @@
+# OS
 .DS_Store
-# Xcode
+
+# Xcode / iOS
 xcuserdata/
 DerivedData/
-build/
 *.xcuserstate
 ios/Config/Local.xcconfig
 # SwiftPM
 .build/
+
+# Gradle / Android
+.gradle/
+build/
+local.properties
+*.apk
+*.aab
+captures/
+.externalNativeBuild/
+.cxx/
+.kotlin/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Secrets
+*.jks
+*.keystore
+google-services.json
+.env
