@@ -97,6 +97,10 @@ final class AssistantClient: AssistantService {
     private let session: URLSession
     private let tokens: TokenStore?
 
+    /// pawrise-assistant (Python) parle en snake_case, contrairement à l'API d'auth et à l'API-CORE.
+    static let decoder = APIClient.makeDecoder(keys: .convertFromSnakeCase)
+    static let encoder = APIClient.makeEncoder(keys: .convertToSnakeCase)
+
     init(baseURL: URL, tokens: TokenStore? = nil, session: URLSession = .shared) {
         self.baseURL = baseURL
         self.tokens = tokens
@@ -115,7 +119,7 @@ final class AssistantClient: AssistantService {
                     if let token = await tokens?.tokens?.accessToken {
                         urlRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
                     }
-                    urlRequest.httpBody = try APIClient.encoder.encode(request)
+                    urlRequest.httpBody = try Self.encoder.encode(request)
 
                     let (bytes, response) = try await session.bytes(for: urlRequest)
                     guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
@@ -160,7 +164,7 @@ final class AssistantClient: AssistantService {
 
     static func decode(_ message: SSEParser.Message) throws -> AssistantEvent? {
         guard let data = message.data.data(using: .utf8),
-              let envelope = try? APIClient.decoder.decode(Envelope.self, from: data) else {
+              let envelope = try? Self.decoder.decode(Envelope.self, from: data) else {
             return nil // ping ou commentaire
         }
         switch envelope.type {

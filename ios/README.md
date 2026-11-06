@@ -11,14 +11,28 @@ Par défaut (Debug) l'app fonctionne **sans serveur** :
 
 | Brique | Mode Debug | Remplacé plus tard par |
 |---|---|---|
-| Comptes | `MockAuthService`, mêmes règles et codes d'erreur que [pawrise-auth](https://github.com/Pawrise/pawrise-auth/blob/main/docs/api-contract.md) | `RemoteAuthService` (`PAWRISE_AUTH_MODE = remote`) |
+| Comptes | `MockAuthService`, mêmes règles et codes d'erreur que [pawrise-auth](https://github.com/Pawrise/pawrise-auth) | `RemoteAuthService` (`PAWRISE_AUTH_MODE = remote`, voir plus bas) |
 | Chiens | Fichier JSON local par compte (`LocalDogRepository`) | Core API |
 | Collier | `MockCollarService` (délai simulé) | Core API |
 | Mesures | `SeedHealthRepository` : données du Figma, scénario Normal ou Anomalie | Core API (séries TimescaleDB) |
 | Chat | **Vrai** `pawrise-assistant` sur `http://127.0.0.1:8100` | Même route derrière KrakenD |
 
 **Compte de démo** : `demo@pawrise.fr` / `pawrise2026` (arrive directement sur le tableau de bord de Nala).
-Créer un compte lance le parcours complet : découverte → profil du chien (9 étapes) → collier → Santé.
+Créer un compte (prénom, nom, e-mail, mot de passe, case CGU obligatoire) lance le parcours complet : découverte → profil du chien (9 étapes) → collier → Santé.
+« Mot de passe oublié ? » envoie un code à 6 chiffres ; en mode simulé, le code est `123456`.
+
+## Brancher le vrai serveur d'auth
+
+L'app suit le contrat `Compte` de [pawrise-doc](https://github.com/AadiDevv/pawrise-doc/blob/main/contrat-interface/openapi.yaml) (JSON camelCase, erreurs avec `code`), implémenté par [pawrise-auth](https://github.com/Pawrise/pawrise-auth).
+
+```sh
+cd ../pawrise-auth            # git clone git@github.com:Pawrise/pawrise-auth.git
+cp .env.example .env && npm install
+npm run db:up && npm run db:migrate && npm run db:seed   # Postgres, Mailpit, compte de démo
+npm run dev                   # http://localhost:8200
+```
+
+Puis dans `Config/Local.xcconfig` : `PAWRISE_AUTH_MODE = remote`. Les e-mails (lien de confirmation, code de réinitialisation) arrivent dans Mailpit : http://localhost:8125.
 
 Codes collier de test : n'importe quel `PW-XXXXXX` valide fonctionne ; `PW-000000` simule « déjà associé », `PW-999999` simule « collier injoignable ».
 
@@ -68,7 +82,7 @@ Sans client configuré, le bouton Google affiche un message explicite au lieu de
 Pawrise/
   App/            Point d'entrée, assemblage des services (AppEnvironment), aiguillage (RootView)
   Core/
-    Auth/         Contrat pawrise-auth, TokenStore (Keychain + refresh unique), SessionStore, Apple/Google
+    Auth/         Contrat Compte (pawrise-doc), TokenStore (Keychain + refresh unique), SessionStore, Apple/Google
     Network/      APIClient (JSON, RFC 9457, retry après refresh), AssistantClient (SSE)
     Storage/      Keychain
   Data/           Dépôts : chiens, mesures simulées, collier
@@ -92,10 +106,12 @@ Le Figma utilise Bricolage Grotesque, Inter et DM Mono. Tant que les `.ttf` ne s
 xcodebuild test -project Pawrise.xcodeproj -scheme Pawrise -destination 'platform=iOS Simulator,name=iPhone 17'
 ```
 
-- `PawriseTests` (Swift Testing) : règles de saisie, analyseur SSE et décodage des réponses de l'assistant, auth simulée (codes d'erreur, verrouillage, rotation du refresh token), refresh unique en concurrence, données simulées, conversation du chat.
+- `PawriseTests` (Swift Testing) : règles de saisie (e-mail, téléphone E.164, code), contrat d'auth (JSON camelCase, erreurs par champ), analyseur SSE et décodage des réponses de l'assistant, auth simulée (codes d'erreur, verrouillage, rotation du refresh token, mot de passe oublié), refresh unique en concurrence, données simulées, conversation du chat.
 - `PawriseUITests` (XCUITest) : deux parcours complets dans le simulateur, avec captures d'écran jointes au rapport :
-  1. inscription → découverte → profil du chien → collier → Santé → détail d'un indicateur ;
+  1. inscription (refus sans CGU, puis acceptation) → découverte → profil du chien → collier → Santé → détail d'un indicateur ;
   2. compte de démo → Chat IA → question au vrai `pawrise-assistant`. Ce test est ignoré si l'assistant ne tourne pas sur `127.0.0.1:8100`.
+
+Les deux parcours passent aussi en mode `remote` contre pawrise-auth lancé en local.
 
 L'argument de lancement `-PawriseUITestReset` (Debug uniquement) remet l'app à zéro avant chaque parcours.
 

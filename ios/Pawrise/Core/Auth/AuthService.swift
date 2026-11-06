@@ -10,8 +10,12 @@ protocol AuthService: Sendable {
     func refresh(refreshToken: String) async throws -> TokenPair
     func logout(refreshToken: String) async throws
     func currentUser() async throws -> AuthUser
+    func requestPasswordReset(_ request: ForgotPasswordRequest) async throws
+    func resetPassword(_ request: ResetPasswordRequest) async throws
+    func resendVerificationEmail() async throws
 }
 
+/// Client de pawrise-auth (routes `/v1/auth/*` et `/v1/me`).
 final class RemoteAuthService: AuthService {
     private let client: APIClient
 
@@ -36,10 +40,7 @@ final class RemoteAuthService: AuthService {
     }
 
     func refresh(refreshToken: String) async throws -> TokenPair {
-        let response: RefreshResponse = try await client.send(
-            .post("v1/auth/refresh", body: RefreshRequest(refreshToken: refreshToken), auth: false)
-        )
-        return response.tokens
+        try await client.send(.post("v1/auth/refresh", body: RefreshRequest(refreshToken: refreshToken), auth: false))
     }
 
     func logout(refreshToken: String) async throws {
@@ -48,5 +49,17 @@ final class RemoteAuthService: AuthService {
 
     func currentUser() async throws -> AuthUser {
         try await client.send(.get("v1/me"))
+    }
+
+    func requestPasswordReset(_ request: ForgotPasswordRequest) async throws {
+        try await client.sendWithoutResponse(.post("v1/auth/forgot-password", body: request, auth: false))
+    }
+
+    func resetPassword(_ request: ResetPasswordRequest) async throws {
+        try await client.sendWithoutResponse(.post("v1/auth/reset-password", body: request, auth: false))
+    }
+
+    func resendVerificationEmail() async throws {
+        try await client.sendWithoutResponse(.post("v1/auth/resend-verification"))
     }
 }

@@ -45,6 +45,13 @@ struct SocialSignInSection: View {
                 }
             }
             .buttonStyle(GoogleButtonStyle())
+
+            // RG11 : le bouton Apple / Google vaut acceptation des CGU (version envoyée au serveur).
+            Text("En continuant avec Apple ou Google, vous acceptez les conditions d'utilisation et la politique de confidentialité de Pawrise.")
+                .font(Font.Pawrise.caption)
+                .foregroundStyle(Color.Pawrise.textMuted)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
         }
         .disabled(isWorking)
         .padding(.top, 8)

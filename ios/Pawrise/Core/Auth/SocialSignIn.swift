@@ -46,13 +46,14 @@ final class SocialSignIn {
                   let idToken = String(data: tokenData, encoding: .utf8) else {
                 throw Failure.missingToken
             }
-            let code = credential.authorizationCode.flatMap { String(data: $0, encoding: .utf8) }
-            let name = credential.fullName.map { PersonNameComponentsFormatter.localizedString(from: $0, style: .default) }
+            let given = credential.fullName?.givenName?.trimmingCharacters(in: .whitespaces)
+            let family = credential.fullName?.familyName?.trimmingCharacters(in: .whitespaces)
             return AppleSignInRequest(
-                idToken: idToken,
-                authorizationCode: code,
+                identityToken: idToken,
                 nonce: nonce,
-                name: name?.isEmpty == false ? name : nil
+                firstName: given?.isEmpty == false ? given : nil,
+                lastName: family?.isEmpty == false ? family : nil,
+                acceptedTermsVersion: LegalTerms.version
             )
         }
     }
@@ -72,7 +73,7 @@ final class SocialSignIn {
             // GoogleSignIn 8.x ne permet pas de fixer le nonce : le contrat le rend facultatif pour Google.
             let result = try await GIDSignIn.sharedInstance.signIn(withPresenting: presenter)
             guard let idToken = result.user.idToken?.tokenString else { throw Failure.missingToken }
-            return GoogleSignInRequest(idToken: idToken, nonce: nil, name: result.user.profile?.name)
+            return GoogleSignInRequest(idToken: idToken, nonce: nil, acceptedTermsVersion: LegalTerms.version)
         } catch let error as NSError where error.domain == kGIDSignInErrorDomain && error.code == GIDSignInError.canceled.rawValue {
             throw Failure.cancelled
         }

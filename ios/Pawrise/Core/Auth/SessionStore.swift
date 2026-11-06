@@ -51,27 +51,54 @@ final class SessionStore {
         }
     }
 
-    func register(name: String, email: String, phone: String?, password: String) async throws {
+    /// S20 Inscription. `phoneNumber` est déjà au format E.164 (ou nil) ; les CGU affichées valent acceptation.
+    func register(firstName: String, lastName: String, email: String, phoneNumber: String?, password: String) async throws {
         let request = RegisterRequest(
+            firstName: firstName.trimmingCharacters(in: .whitespaces),
+            lastName: lastName.trimmingCharacters(in: .whitespaces),
             email: CredentialRules.normalizedEmail(email),
+            phoneNumber: phoneNumber,
             password: password,
-            name: name.trimmingCharacters(in: .whitespaces),
-            phone: phone?.isEmpty == true ? nil : phone,
-            termsAccepted: true
+            acceptedTermsVersion: LegalTerms.version
         )
-        try await complete(auth.register(request))
+        try await complete(auth.register(request), isNew: true)
     }
 
     func login(email: String, password: String) async throws {
-        try await complete(auth.login(LoginRequest(email: CredentialRules.normalizedEmail(email), password: password)))
+        try await complete(auth.login(LoginRequest(email: CredentialRules.normalizedEmail(email), password: password)), isNew: false)
     }
 
     func signInWithApple(_ request: AppleSignInRequest) async throws {
-        try await complete(auth.signInWithApple(request))
+        let response = try await auth.signInWithApple(request)
+        await complete(response, isNew: response.isNewUser ?? false)
     }
 
     func signInWithGoogle(_ request: GoogleSignInRequest) async throws {
-        try await complete(auth.signInWithGoogle(request))
+        let response = try await auth.signInWithGoogle(request)
+        await complete(response, isNew: response.isNewUser ?? false)
+    }
+
+    /// Mot de passe oublié : le serveur envoie un code à 6 chiffres par e-mail (réponse identique si le compte n'existe pas).
+    func requestPasswordReset(email: String) async throws {
+        try await auth.requestPasswordReset(ForgotPasswordRequest(email: CredentialRules.normalizedEmail(email)))
+    }
+
+    /// Nouveau mot de passe avec le code reçu, puis connexion directe.
+    func resetPassword(email: String, code: String, newPassword: String) async throws {
+        let email = CredentialRules.normalizedEmail(email)
+        try await auth.resetPassword(ResetPasswordRequest(email: email, code: code, newPassword: newPassword))
+        try await login(email: email, password: newPassword)
+    }
+
+    func resendVerificationEmail() async throws {
+        try await auth.resendVerificationEmail()
+    }
+
+    /// Recharge le compte (après avoir confirmé son adresse depuis l'e-mail, par exemple).
+    func refreshUser() async {
+        guard let fresh = try? await auth.currentUser() else { return }
+        cache(fresh)
+        phase = .signedIn(fresh)
     }
 
     func logout() async {
@@ -90,18 +117,15 @@ final class SessionStore {
         isNewAccount = false
     }
 
-    private func complete(_ response: AuthResponse) async {
+    private func complete(_ response: AuthResponse, isNew: Bool) async {
         await tokens.save(response.tokens)
         cache(response.user)
-        isNewAccount = response.isNewUser
+        isNewAccount = isNew
         phase = .signedIn(response.user)
     }
 
     private func cache(_ user: AuthUser) {
-        let encoder = JSONEncoder()
-        encoder.keyEncodingStrategy = .convertToSnakeCase
-        encoder.dateEncodingStrategy = .iso8601
-        if let data = try? encoder.encode(user) { keychain.set(data, for: userKey) }
+        if let data = try? APIClient.encoder.encode(user) { keychain.set(data, for: userKey) }
     }
 
     private func clearLocalSession() async {

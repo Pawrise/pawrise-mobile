@@ -6,15 +6,38 @@ struct SettingsView: View {
     @Environment(SessionStore.self) private var session
     @Environment(DogStore.self) private var dogs
     @State private var isLoggingOut = false
+    @State private var verificationMessage: String?
+    @State private var isSendingVerification = false
 
     var body: some View {
         @Bindable var environment = environment
         NavigationStack {
             List {
                 if let user = session.user {
-                    Section("Compte") {
-                        LabeledContent("Nom", value: user.name)
+                    Section {
+                        LabeledContent("Nom", value: user.fullName)
                         LabeledContent("E-mail", value: user.email)
+                        if let phone = user.phoneNumber {
+                            LabeledContent("Téléphone", value: phone)
+                        }
+                        if !user.emailVerified {
+                            Button {
+                                resendVerification()
+                            } label: {
+                                HStack {
+                                    Label("Renvoyer le lien de confirmation", systemImage: "envelope.badge")
+                                    Spacer()
+                                    if isSendingVerification { ProgressView() }
+                                }
+                            }
+                            .disabled(isSendingVerification)
+                        }
+                    } header: {
+                        Text("Compte")
+                    } footer: {
+                        if !user.emailVerified {
+                            Text(verificationMessage ?? "Adresse e-mail pas encore confirmée : ouvrez le lien reçu par e-mail.")
+                        }
                     }
                 }
 
@@ -75,6 +98,21 @@ struct SettingsView: View {
             .scrollContentBackground(.hidden)
             .background(Color.Pawrise.page.ignoresSafeArea())
             .navigationTitle("Paramètres")
+            .task { await session.refreshUser() }
+            .refreshable { await session.refreshUser() }
+        }
+    }
+
+    private func resendVerification() {
+        isSendingVerification = true
+        Task {
+            defer { isSendingVerification = false }
+            do {
+                try await session.resendVerificationEmail()
+                verificationMessage = "Nouveau lien envoyé. Il est valable 24 heures."
+            } catch {
+                verificationMessage = error.localizedDescription
+            }
         }
     }
 

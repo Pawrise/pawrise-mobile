@@ -16,12 +16,16 @@ struct Endpoint: Sendable {
         Endpoint(method: .post, path: path, body: body, requiresAuth: auth)
     }
 
+    static func patch(_ path: String, body: any Encodable & Sendable) -> Endpoint {
+        Endpoint(method: .patch, path: path, body: body, requiresAuth: true)
+    }
+
     static func delete(_ path: String) -> Endpoint {
         Endpoint(method: .delete, path: path, body: nil, requiresAuth: true)
     }
 }
 
-/// Client HTTP JSON des services Pawrise.
+/// Client HTTP JSON des services Pawrise (JSON en camelCase, convention 3 de pawrise-doc).
 /// - ajoute `Authorization: Bearer` pour les routes protégées ;
 /// - sur 401, rafraîchit la session une fois (via TokenStore) puis rejoue la requête ;
 /// - décode les erreurs RFC 9457 en `APIError.problem`.
@@ -30,9 +34,13 @@ final class APIClient: Sendable {
     private let session: URLSession
     private let tokens: TokenStore
 
-    static let decoder: JSONDecoder = {
+    static let decoder: JSONDecoder = makeDecoder(keys: .useDefaultKeys)
+    static let encoder: JSONEncoder = makeEncoder(keys: .useDefaultKeys)
+
+    /// Dates ISO 8601 en UTC, avec ou sans millisecondes (convention 1).
+    static func makeDecoder(keys: JSONDecoder.KeyDecodingStrategy) -> JSONDecoder {
         let decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        decoder.keyDecodingStrategy = keys
         decoder.dateDecodingStrategy = .custom { decoder in
             let string = try decoder.singleValueContainer().decode(String.self)
             let withFraction = ISO8601DateFormatter()
@@ -43,14 +51,14 @@ final class APIClient: Sendable {
             throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath, debugDescription: "Date ISO 8601 invalide : \(string)"))
         }
         return decoder
-    }()
+    }
 
-    static let encoder: JSONEncoder = {
+    static func makeEncoder(keys: JSONEncoder.KeyEncodingStrategy) -> JSONEncoder {
         let encoder = JSONEncoder()
-        encoder.keyEncodingStrategy = .convertToSnakeCase
+        encoder.keyEncodingStrategy = keys
         encoder.dateEncodingStrategy = .iso8601
         return encoder
-    }()
+    }
 
     init(baseURL: URL, tokens: TokenStore, session: URLSession = .shared) {
         self.baseURL = baseURL

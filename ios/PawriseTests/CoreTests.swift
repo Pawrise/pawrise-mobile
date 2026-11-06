@@ -27,6 +27,22 @@ struct InputRulesTests {
         #expect(CredentialRules.isValidPassword("éàçùéàçù"))
     }
 
+    @Test func phoneNumbersBecomeE164() {
+        #expect(CredentialRules.e164Phone("06 12 34 56 78") == "+33612345678")
+        #expect(CredentialRules.e164Phone("06.12.34.56.78") == "+33612345678")
+        #expect(CredentialRules.e164Phone("+33 6 12 34 56 78") == "+33612345678")
+        #expect(CredentialRules.e164Phone("0033612345678") == "+33612345678")
+        #expect(CredentialRules.e164Phone("0612") == nil)
+        #expect(CredentialRules.e164Phone("+0612345678") == nil)
+    }
+
+    @Test func resetCodeIsSixDigits() {
+        #expect(CredentialRules.isValidResetCode("012345"))
+        #expect(!CredentialRules.isValidResetCode("12345"))
+        #expect(!CredentialRules.isValidResetCode("12345a"))
+        #expect(!CredentialRules.isValidResetCode("١٢٣٤٥٦")) // chiffres non ASCII
+    }
+
     @Test(arguments: ["PW-ABC123", "pw-abc123", " PW - ABC 123 "])
     func acceptsCollarCodes(_ code: String) {
         #expect(Collar.isValidCode(code))
@@ -103,44 +119,89 @@ struct SSETests {
             threadId: "t1", turnId: "u1", petRef: "pet_demo_nala", userMessage: "Et son sommeil ?",
             history: [AssistantTurn(role: .owner, content: "Bonjour")], alertContext: nil
         )
-        let json = try #require(String(data: APIClient.encoder.encode(request), encoding: .utf8))
+        let json = try #require(String(data: AssistantClient.encoder.encode(request), encoding: .utf8))
         #expect(json.contains(#""pet_ref":"pet_demo_nala""#))
         #expect(json.contains(#""user_message":"Et son sommeil ?""#))
         #expect(json.contains(#""thread_id":"t1""#))
     }
 }
 
-@Suite("Authentification simulée (contrat pawrise-auth)")
+@Suite("Contrat d'auth : JSON camelCase et erreurs (pawrise-doc / pawrise-auth)")
+struct AuthContractTests {
+    @Test func decodesAuthSessionFromPawriseAuth() throws {
+        // Réponse réelle de POST /v1/auth/register (pawrise-auth).
+        let json = """
+        {"accessToken":"eyJ.a.b","refreshToken":"prt_x","user":{"id":"9403c4db-d6c2-4856-82e4-ab0cac2b54c9",
+        "firstName":"Camille","lastName":"Martin","email":"camille@example.com","phoneNumber":null,
+        "registeredAt":"2026-11-06T15:20:22.687Z","emailVerified":false}}
+        """
+        let session = try APIClient.decoder.decode(AuthResponse.self, from: Data(json.utf8))
+        #expect(session.tokens == TokenPair(accessToken: "eyJ.a.b", refreshToken: "prt_x"))
+        #expect(session.user.fullName == "Camille Martin")
+        #expect(session.user.phoneNumber == nil)
+        #expect(session.isNewUser == nil)
+    }
+
+    @Test func encodesRegisterRequestInCamelCase() throws {
+        let request = RegisterRequest(
+            firstName: "Camille", lastName: "Martin", email: "camille@example.com",
+            phoneNumber: "+33612345678", password: "chien-oslo-2026", acceptedTermsVersion: LegalTerms.version
+        )
+        let json = try #require(String(data: APIClient.encoder.encode(request), encoding: .utf8))
+        #expect(json.contains(#""firstName":"Camille""#))
+        #expect(json.contains(#""acceptedTermsVersion":"2026-10""#))
+        #expect(json.contains(#""phoneNumber":"+33612345678""#))
+    }
+
+    @Test func mapsValidationErrorsToFieldMessages() throws {
+        let json = #"{"status":400,"code":"VALIDATION_FAILED","title":"Validation failed","errors":[{"field":"password","code":"PASSWORD_BREACHED"},{"field":"email","code":"INVALID_EMAIL"}]}"#
+        let problem = try APIClient.decoder.decode(ProblemDetails.self, from: Data(json.utf8))
+        let error = APIError.problem(status: 400, problem)
+        #expect(error.fieldErrors.count == 2)
+        #expect(error.localizedDescription.contains("fuite de données"))
+        #expect(APIError.problem(409, "EMAIL_ALREADY_USED").localizedDescription.contains("existe déjà"))
+        #expect(APIError.problem(429, "TOO_MANY_ATTEMPTS").localizedDescription.contains("15 minutes"))
+    }
+}
+
+@Suite("Authentification simulée (mêmes règles que pawrise-auth)")
 struct MockAuthServiceTests {
     private let auth = MockAuthService(latency: .zero)
 
-    private func register(_ email: String, password: String = "un-mot-de-passe-solide") async throws -> AuthResponse {
-        try await auth.register(RegisterRequest(email: email, password: password, name: "Alex Martin", phone: nil, termsAccepted: true))
+    private func register(
+        _ email: String, password: String = "un-mot-de-passe-solide", terms: String = LegalTerms.version
+    ) async throws -> AuthResponse {
+        try await auth.register(RegisterRequest(
+            firstName: "Alex", lastName: "Martin", email: email, phoneNumber: nil,
+            password: password, acceptedTermsVersion: terms
+        ))
+    }
+
+    private func code(of operation: () async throws -> Void) async -> String? {
+        do { try await operation(); return nil } catch let error as APIError { return error.code } catch { return "?" }
     }
 
     @Test func registerThenLogin() async throws {
         let created = try await register("alex@example.com")
-        #expect(created.isNewUser)
-        #expect(created.user.role == .owner)
+        #expect(created.user.fullName == "Alex Martin")
+        #expect(!created.user.emailVerified)
         let logged = try await auth.login(LoginRequest(email: "alex@example.com", password: "un-mot-de-passe-solide"))
-        #expect(!logged.isNewUser)
         #expect(logged.user.id == created.user.id)
     }
 
     @Test func duplicateEmailIsRejected() async throws {
         _ = try await register("alex@example.com")
-        await #expect(throws: APIError.self) { try await register("ALEX@example.com") }
-        do { _ = try await register("alex@example.com") } catch let error as APIError {
-            #expect(error.code == "email_taken")
-        }
+        #expect(await code { _ = try await register("ALEX@example.com") } == "EMAIL_ALREADY_USED")
     }
 
-    @Test func weakPasswordIsRejected() async {
+    @Test func validationReportsEveryField() async {
         do {
-            _ = try await register("alex@example.com", password: "12345678")
-            Issue.record("mot de passe courant accepté")
+            _ = try await register("pas-un-email", password: "12345678", terms: "")
+            Issue.record("inscription invalide acceptée")
         } catch let error as APIError {
-            #expect(error.code == "weak_password")
+            #expect(error.code == "VALIDATION_FAILED")
+            #expect(Set(error.fieldErrors.map(\.field)) == ["email", "password", "acceptedTermsVersion"])
+            #expect(error.fieldErrors.first { $0.field == "password" }?.code == "PASSWORD_TOO_COMMON")
         } catch {
             Issue.record("erreur inattendue \(error)")
         }
@@ -148,24 +209,29 @@ struct MockAuthServiceTests {
 
     @Test func locksAfterFiveFailures() async throws {
         for _ in 0..<5 {
-            await #expect(throws: APIError.self) {
-                try await auth.login(LoginRequest(email: MockAuthService.demoEmail, password: "mauvais"))
-            }
+            #expect(await code { _ = try await auth.login(LoginRequest(email: MockAuthService.demoEmail, password: "mauvais")) } == "INVALID_CREDENTIALS")
         }
-        do {
+        #expect(await code {
             _ = try await auth.login(LoginRequest(email: MockAuthService.demoEmail, password: MockAuthService.demoPassword))
-            Issue.record("le compte devait être verrouillé")
-        } catch let error as APIError {
-            #expect(error.code == "account_locked")
-        }
+        } == "TOO_MANY_ATTEMPTS")
     }
 
     @Test func refreshTokenRotates() async throws {
         let session = try await auth.login(LoginRequest(email: MockAuthService.demoEmail, password: MockAuthService.demoPassword))
         let rotated = try await auth.refresh(refreshToken: session.tokens.refreshToken)
         #expect(rotated.refreshToken != session.tokens.refreshToken)
-        // L'ancien refresh token ne marche plus
-        await #expect(throws: APIError.self) { try await auth.refresh(refreshToken: session.tokens.refreshToken) }
+        #expect(await code { _ = try await auth.refresh(refreshToken: session.tokens.refreshToken) } == "INVALID_REFRESH_TOKEN")
+    }
+
+    @Test func passwordResetWithCode() async throws {
+        let email = MockAuthService.demoEmail
+        try await auth.requestPasswordReset(ForgotPasswordRequest(email: email))
+        #expect(await code {
+            try await auth.resetPassword(ResetPasswordRequest(email: email, code: "000000", newPassword: "nouveau-chien-2026"))
+        } == "INVALID_OR_EXPIRED_TOKEN")
+        try await auth.resetPassword(ResetPasswordRequest(email: email, code: MockAuthService.resetCode, newPassword: "nouveau-chien-2026"))
+        _ = try await auth.login(LoginRequest(email: email, password: "nouveau-chien-2026"))
+        #expect(await code { _ = try await auth.login(LoginRequest(email: email, password: MockAuthService.demoPassword)) } == "INVALID_CREDENTIALS")
     }
 }
 
@@ -178,12 +244,12 @@ struct TokenStoreTests {
 
     @Test func concurrentRefreshesShareOneRequest() async throws {
         let store = TokenStore(keychain: KeychainStore(service: "fr.pawrise.tests.\(UUID().uuidString)"))
-        await store.save(TokenPair(accessToken: "old", refreshToken: "r0", tokenType: "Bearer", expiresIn: 900))
+        await store.save(TokenPair(accessToken: "old", refreshToken: "r0"))
         let counter = Counter()
         await store.setRefresher { _ in
             let n = await counter.increment()
             try await Task.sleep(for: .milliseconds(50))
-            return TokenPair(accessToken: "new\(n)", refreshToken: "r\(n)", tokenType: "Bearer", expiresIn: 900)
+            return TokenPair(accessToken: "new\(n)", refreshToken: "r\(n)")
         }
 
         async let a = store.refreshedTokens(replacing: "old")
@@ -198,7 +264,7 @@ struct TokenStoreTests {
 
     @Test func failedRefreshClearsSession() async {
         let store = TokenStore(keychain: KeychainStore(service: "fr.pawrise.tests.\(UUID().uuidString)"))
-        await store.save(TokenPair(accessToken: "old", refreshToken: "r0", tokenType: "Bearer", expiresIn: 900))
+        await store.save(TokenPair(accessToken: "old", refreshToken: "r0"))
         await store.setRefresher { _ in throw APIError.unexpectedStatus(401) }
         await #expect(throws: APIError.sessionExpired) { try await store.refreshedTokens(replacing: "old") }
         #expect(await store.tokens == nil)
