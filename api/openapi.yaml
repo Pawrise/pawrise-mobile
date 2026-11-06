@@ -1,22 +1,677 @@
-# Contrat d'interface de l'API Pawrise vu par l'app mobile.
-# PROVISOIRE : seul /health existe. À remplacer par le contrat de l'équipe backend
-# (inscription, connexion, refresh, profil chien, activation du collier).
+# Contrat de pawrise-auth v1, vu par l'app mobile, servi par le mock Prism (compose.yaml).
+# Source de vérité : pawrise-auth/docs/api-contract.md. Ce fichier en est la traduction
+# OpenAPI ; en cas d'écart, c'est le .md qui fait foi et ce fichier qu'on corrige.
+#
+# Forcer une réponse précise du mock (états d'erreur des écrans) :
+#   Prefer: code=409                     → statut voulu
+#   Prefer: example=account_locked       → exemple nommé
+# Les routes Bearer renvoient 401 sans en-tête Authorization (n'importe quel jeton passe).
 openapi: 3.1.0
 info:
-  title: Pawrise API (mock mobile)
-  version: 0.0.1
+  title: pawrise-auth
+  version: 1.0.0
+  description: Comptes propriétaires, sessions, e-mail et mot de passe. Corps en snake_case, dates ISO 8601 UTC.
+servers:
+  - url: http://localhost:4010
+    description: Mock Prism (adb reverse tcp:4010 tcp:4010)
+  - url: http://localhost:8200
+    description: KrakenD local
+  - url: https://api.pawrise.fr
+    description: Production
+
+tags:
+  - name: auth
+  - name: session
+  - name: password
+  - name: me
+
 paths:
+  /v1/auth/register:
+    post:
+      tags: [auth]
+      operationId: register
+      summary: Créer un compte e-mail + mot de passe
+      description: Un e-mail de vérification part en arrière-plan ; le compte est utilisable tout de suite.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterRequest' }
+      responses:
+        '201':
+          description: Compte créé
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+              examples:
+                new_user: { $ref: '#/components/examples/AuthNewUser' }
+        '409':
+          $ref: '#/components/responses/EmailTaken'
+        '422':
+          description: Champ invalide ou mot de passe refusé
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              examples:
+                validation_failed: { $ref: '#/components/examples/ValidationFailed' }
+                weak_password: { $ref: '#/components/examples/WeakPassword' }
+                password_breached: { $ref: '#/components/examples/PasswordBreached' }
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /v1/auth/login:
+    post:
+      tags: [auth]
+      operationId: login
+      summary: Se connecter
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200':
+          description: Connecté
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+              examples:
+                existing_user: { $ref: '#/components/examples/AuthExistingUser' }
+        '401':
+          description: Identifiants incorrects (même réponse si l'e-mail n'existe pas)
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              examples:
+                invalid_credentials: { $ref: '#/components/examples/InvalidCredentials' }
+        '423':
+          description: 5 échecs en 15 min
+          headers:
+            Retry-After: { $ref: '#/components/headers/RetryAfter' }
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              examples:
+                account_locked: { $ref: '#/components/examples/AccountLocked' }
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /v1/auth/apple:
+    post:
+      tags: [auth]
+      operationId: signInWithApple
+      summary: Se connecter / s'inscrire avec Apple
+      description: L'app envoie le SHA-256 du nonce à Apple, puis la valeur brute ici. `name` n'est connu qu'à la première connexion.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id_token, authorization_code, nonce]
+              properties:
+                id_token: { type: string }
+                authorization_code: { type: string }
+                nonce: { type: string }
+                name: { type: string, maxLength: 100 }
+      responses:
+        '200':
+          description: Connecté (is_new_user selon le cas)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+              examples:
+                new_user: { $ref: '#/components/examples/AuthNewUser' }
+        '401':
+          $ref: '#/components/responses/ProviderTokenInvalid'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+
+  /v1/auth/google:
+    post:
+      tags: [auth]
+      operationId: signInWithGoogle
+      summary: Se connecter / s'inscrire avec Google
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id_token]
+              properties:
+                id_token: { type: string }
+                nonce: { type: string }
+                name: { type: string, maxLength: 100 }
+      responses:
+        '200':
+          description: Connecté (is_new_user selon le cas)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+              examples:
+                new_user: { $ref: '#/components/examples/AuthNewUser' }
+        '401':
+          description: Jeton Google refusé ou e-mail Google non vérifié
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              examples:
+                provider_token_invalid: { $ref: '#/components/examples/ProviderTokenInvalid' }
+                provider_email_unverified: { $ref: '#/components/examples/ProviderEmailUnverified' }
+
+  /v1/auth/refresh:
+    post:
+      tags: [session]
+      operationId: refresh
+      summary: Nouveau couple de tokens
+      description: Le refresh token change à chaque appel. Réutiliser un ancien refresh token révoque toute la session.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token: { type: string, examples: ['prt_4bS0n9xQ'] }
+      responses:
+        '200':
+          description: Nouveaux tokens
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [tokens]
+                properties:
+                  tokens: { $ref: '#/components/schemas/TokenPair' }
+              example:
+                tokens:
+                  access_token: eyJhbGciOiJSUzI1NiIsImtpZCI6IjIwMjYtMTEiLCJ0eXAiOiJhdCtqd3QifQ.refreshed
+                  refresh_token: prt_9kLm2Wv7
+                  token_type: Bearer
+                  expires_in: 900
+        '401':
+          description: Refresh token inconnu, expiré ou révoqué. L'app déconnecte l'utilisateur.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              examples:
+                invalid_refresh_token: { $ref: '#/components/examples/InvalidRefreshToken' }
+
+  /v1/auth/logout:
+    post:
+      tags: [session]
+      operationId: logout
+      summary: Révoquer la session courante
+      security: [{ bearer: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token: { type: string }
+      responses:
+        '204': { description: Session révoquée }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /v1/auth/logout-all:
+    post:
+      tags: [session]
+      operationId: logoutAll
+      summary: Révoquer toutes les sessions
+      security: [{ bearer: [] }]
+      responses:
+        '204': { description: Tous les appareils sont déconnectés }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /v1/auth/verify-email:
+    post:
+      tags: [password]
+      operationId: verifyEmail
+      summary: Valider l'e-mail (lien https://pawrise.fr/verify?token=…)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string }
+      responses:
+        '204': { description: E-mail vérifié }
+        '400': { $ref: '#/components/responses/InvalidCode' }
+
+  /v1/auth/resend-verification:
+    post:
+      tags: [password]
+      operationId: resendVerification
+      summary: Renvoyer l'e-mail de vérification (1 / min)
+      security: [{ bearer: [] }]
+      responses:
+        '204': { description: E-mail renvoyé }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /v1/auth/forgot-password:
+    post:
+      tags: [password]
+      operationId: forgotPassword
+      summary: Recevoir un code de réinitialisation
+      description: Toujours 202, que l'e-mail existe ou non.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email, maxLength: 254 }
+      responses:
+        '202': { description: Code envoyé si le compte existe }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /v1/auth/reset-password:
+    post:
+      tags: [password]
+      operationId: resetPassword
+      summary: Choisir un nouveau mot de passe avec le code
+      description: Code à 6 chiffres, valable 15 min, 5 essais. Révoque toutes les sessions.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, code, new_password]
+              properties:
+                email: { type: string, format: email, maxLength: 254 }
+                code: { type: string, pattern: '^[0-9]{6}$', examples: ['123456'] }
+                new_password: { $ref: '#/components/schemas/Password' }
+      responses:
+        '204': { description: Mot de passe changé }
+        '400': { $ref: '#/components/responses/InvalidCode' }
+        '422': { $ref: '#/components/responses/PasswordRejected' }
+
+  /v1/auth/change-password:
+    post:
+      tags: [password]
+      operationId: changePassword
+      summary: Changer de mot de passe (connecté)
+      security: [{ bearer: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [current_password, new_password]
+              properties:
+                current_password: { type: string }
+                new_password: { $ref: '#/components/schemas/Password' }
+      responses:
+        '200':
+          description: Nouveaux tokens, autres sessions révoquées
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+              examples:
+                existing_user: { $ref: '#/components/examples/AuthExistingUser' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/PasswordRejected' }
+
+  /v1/me:
+    get:
+      tags: [me]
+      operationId: getMe
+      summary: Compte courant
+      security: [{ bearer: [] }]
+      responses:
+        '200':
+          description: Compte
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+              example:
+                id: 8f0f6b1e-6a3c-4a8e-9d5b-0f4f1c9e2a11
+                email: alex@example.com
+                name: Alex Martin
+                phone: '+33612345678'
+                email_verified: true
+                role: owner
+                providers: [password]
+                created_at: '2026-11-06T10:12:00Z'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    patch:
+      tags: [me]
+      operationId: updateMe
+      summary: Modifier nom / téléphone
+      security: [{ bearer: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, minLength: 1, maxLength: 100 }
+                phone: { type: string, pattern: '^\+[1-9][0-9]{6,14}$' }
+      responses:
+        '200':
+          description: Compte modifié
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+    delete:
+      tags: [me]
+      operationId: deleteMe
+      summary: Supprimer le compte (RGPD art. 17)
+      security: [{ bearer: [] }]
+      responses:
+        '204': { description: Compte supprimé }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
   /health:
     get:
-      summary: Vérifie que le mock répond
+      operationId: health
+      summary: Sonde
       responses:
-        "200":
+        '200':
           description: OK
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  status:
-                    type: string
-                    example: ok
+                  status: { type: string }
+              example: { status: ok }
+
+components:
+  securitySchemes:
+    bearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  headers:
+    RetryAfter:
+      description: Secondes avant de pouvoir réessayer
+      schema: { type: integer, examples: [900] }
+
+  schemas:
+    Password:
+      type: string
+      minLength: 8
+      maxLength: 128
+      description: 8 à 128 caractères Unicode, hors 10 000 plus courants et hors Have I Been Pwned.
+
+    RegisterRequest:
+      type: object
+      required: [email, password, name, terms_accepted]
+      properties:
+        email: { type: string, format: email, maxLength: 254, examples: ['alex@example.com'] }
+        password: { $ref: '#/components/schemas/Password' }
+        name: { type: string, minLength: 1, maxLength: 100, examples: ['Alex Martin'] }
+        phone: { type: string, pattern: '^\+[1-9][0-9]{6,14}$', description: Optionnel, format E.164, examples: ['+33612345678'] }
+        terms_accepted: { type: boolean, const: true, description: Consentement CGU + politique de confidentialité }
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email, maxLength: 254, examples: ['alex@example.com'] }
+        password: { type: string, minLength: 1, maxLength: 128 }
+
+    TokenPair:
+      type: object
+      required: [access_token, refresh_token, token_type, expires_in]
+      properties:
+        access_token: { type: string, description: JWT RS256 (RFC 9068), 15 min. L'app ne le décode pas. }
+        refresh_token: { type: string, description: Opaque, 30 jours glissants, change à chaque refresh. }
+        token_type: { type: string, const: Bearer }
+        expires_in: { type: integer, description: Secondes, examples: [900] }
+
+    User:
+      type: object
+      required: [id, email, name, email_verified, role, providers, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        name: { type: string }
+        phone: { type: [string, 'null'] }
+        email_verified: { type: boolean }
+        role: { type: string, enum: [owner, vet, admin] }
+        providers:
+          type: array
+          items: { type: string, enum: [password, apple, google] }
+        created_at: { type: string, format: date-time }
+
+    AuthResponse:
+      type: object
+      required: [tokens, user, is_new_user]
+      properties:
+        tokens: { $ref: '#/components/schemas/TokenPair' }
+        user: { $ref: '#/components/schemas/User' }
+        is_new_user:
+          type: boolean
+          description: true → l'app enchaîne sur la découverte (LearnFlow) puis le profil du chien.
+
+    Problem:
+      type: object
+      description: RFC 9457. L'app se base sur `code`, jamais sur `title` ni `detail`.
+      required: [type, title, status, code]
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        code:
+          type: string
+          enum:
+            - validation_failed
+            - email_taken
+            - weak_password
+            - password_breached
+            - invalid_credentials
+            - account_locked
+            - rate_limited
+            - invalid_refresh_token
+            - provider_token_invalid
+            - provider_email_unverified
+            - invalid_code
+            - unauthorized
+            - forbidden
+            - internal
+        detail: { type: string }
+        errors:
+          type: object
+          description: Erreurs par champ (validation_failed, email_taken…)
+          additionalProperties:
+            type: array
+            items: { type: string }
+
+  responses:
+    EmailTaken:
+      description: E-mail déjà utilisé
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+          examples:
+            email_taken: { $ref: '#/components/examples/EmailTaken' }
+    ValidationFailed:
+      description: Champ manquant ou mal formé
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+          examples:
+            validation_failed: { $ref: '#/components/examples/ValidationFailed' }
+    PasswordRejected:
+      description: Mot de passe refusé
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+          examples:
+            weak_password: { $ref: '#/components/examples/WeakPassword' }
+            password_breached: { $ref: '#/components/examples/PasswordBreached' }
+    RateLimited:
+      description: Trop de requêtes
+      headers:
+        Retry-After: { $ref: '#/components/headers/RetryAfter' }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+          examples:
+            rate_limited: { $ref: '#/components/examples/RateLimited' }
+    Unauthorized:
+      description: Access token absent, expiré ou invalide
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+          examples:
+            unauthorized: { $ref: '#/components/examples/Unauthorized' }
+    InvalidCode:
+      description: Code faux ou expiré
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+          examples:
+            invalid_code: { $ref: '#/components/examples/InvalidCode' }
+    ProviderTokenInvalid:
+      description: Jeton du fournisseur refusé
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+          examples:
+            provider_token_invalid: { $ref: '#/components/examples/ProviderTokenInvalid' }
+
+  examples:
+    AuthNewUser:
+      summary: Compte tout juste créé
+      value:
+        tokens:
+          access_token: eyJhbGciOiJSUzI1NiIsImtpZCI6IjIwMjYtMTEiLCJ0eXAiOiJhdCtqd3QifQ.mock
+          refresh_token: prt_4bS0n9xQ
+          token_type: Bearer
+          expires_in: 900
+        user:
+          id: 8f0f6b1e-6a3c-4a8e-9d5b-0f4f1c9e2a11
+          email: alex@example.com
+          name: Alex Martin
+          phone: '+33612345678'
+          email_verified: false
+          role: owner
+          providers: [password]
+          created_at: '2026-11-06T10:12:00Z'
+        is_new_user: true
+    AuthExistingUser:
+      summary: Compte existant
+      value:
+        tokens:
+          access_token: eyJhbGciOiJSUzI1NiIsImtpZCI6IjIwMjYtMTEiLCJ0eXAiOiJhdCtqd3QifQ.mock
+          refresh_token: prt_4bS0n9xQ
+          token_type: Bearer
+          expires_in: 900
+        user:
+          id: 8f0f6b1e-6a3c-4a8e-9d5b-0f4f1c9e2a11
+          email: alex@example.com
+          name: Alex Martin
+          phone: '+33612345678'
+          email_verified: true
+          role: owner
+          providers: [password]
+          created_at: '2026-11-06T10:12:00Z'
+        is_new_user: false
+    EmailTaken:
+      value:
+        type: https://docs.pawrise.fr/errors/email_taken
+        title: Adresse e-mail déjà utilisée
+        status: 409
+        code: email_taken
+        detail: Un compte existe déjà avec cette adresse.
+        errors: { email: [already_taken] }
+    ValidationFailed:
+      value:
+        type: https://docs.pawrise.fr/errors/validation_failed
+        title: Données invalides
+        status: 422
+        code: validation_failed
+        detail: Un ou plusieurs champs sont invalides.
+        errors: { email: [invalid_format] }
+    WeakPassword:
+      value:
+        type: https://docs.pawrise.fr/errors/weak_password
+        title: Mot de passe trop faible
+        status: 422
+        code: weak_password
+        detail: Le mot de passe doit contenir au moins 8 caractères et ne pas être trop courant.
+        errors: { password: [too_weak] }
+    PasswordBreached:
+      value:
+        type: https://docs.pawrise.fr/errors/password_breached
+        title: Mot de passe compromis
+        status: 422
+        code: password_breached
+        detail: Ce mot de passe apparaît dans une fuite de données connue.
+        errors: { password: [breached] }
+    InvalidCredentials:
+      value:
+        type: https://docs.pawrise.fr/errors/invalid_credentials
+        title: Identifiants incorrects
+        status: 401
+        code: invalid_credentials
+        detail: E-mail ou mot de passe incorrect.
+    AccountLocked:
+      value:
+        type: https://docs.pawrise.fr/errors/account_locked
+        title: Connexion temporairement bloquée
+        status: 423
+        code: account_locked
+        detail: Trop de tentatives. Réessayez dans 15 minutes.
+    RateLimited:
+      value:
+        type: https://docs.pawrise.fr/errors/rate_limited
+        title: Trop de requêtes
+        status: 429
+        code: rate_limited
+        detail: Réessayez dans quelques instants.
+    InvalidRefreshToken:
+      value:
+        type: https://docs.pawrise.fr/errors/invalid_refresh_token
+        title: Session expirée
+        status: 401
+        code: invalid_refresh_token
+        detail: Veuillez vous reconnecter.
+    ProviderTokenInvalid:
+      value:
+        type: https://docs.pawrise.fr/errors/provider_token_invalid
+        title: Connexion refusée par le fournisseur
+        status: 401
+        code: provider_token_invalid
+        detail: Le jeton de connexion n'a pas pu être vérifié.
+    ProviderEmailUnverified:
+      value:
+        type: https://docs.pawrise.fr/errors/provider_email_unverified
+        title: E-mail non vérifié
+        status: 401
+        code: provider_email_unverified
+        detail: L'adresse e-mail de ce compte Google n'est pas vérifiée.
+    Unauthorized:
+      value:
+        type: https://docs.pawrise.fr/errors/unauthorized
+        title: Non authentifié
+        status: 401
+        code: unauthorized
+        detail: Reconnectez-vous.
+    InvalidCode:
+      value:
+        type: https://docs.pawrise.fr/errors/invalid_code
+        title: Code invalide
+        status: 400
+        code: invalid_code
+        detail: Le code est faux ou a expiré.

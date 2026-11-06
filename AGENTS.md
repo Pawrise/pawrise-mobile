@@ -16,7 +16,7 @@ App Android propriétaire de Pawrise (Kotlin, Compose, Material 3). Le projet Gr
 - **Pas de nouveau hex** dans les écrans : passer par `MaterialTheme.colorScheme` ou `PwColors`, `PwRadius`, `PwSpacing` (`core/designsystem`).
 - Un module `feature:*` ne dépend jamais d'un autre `feature:*`. Il expose une `XxxRoute(...)` avec des callbacks de navigation ; c'est `app` qui relie les écrans.
 - Chaque écran : une `Route` (branche le ViewModel) et un `Screen` sans état, avec une `@Preview` 390×844.
-- Contrat de l'API d'auth : `pawrise-auth/docs/api-contract.md`.
+- Contrat de l'API d'auth : `pawrise-auth/docs/api-contract.md` (fait foi), traduit dans `api/openapi.yaml` pour le mock. Mot de passe : 8 caractères minimum (le Figma dit 6, le texte d'aide suit le contrat).
 
 ## Commandes
 

@@ -21,7 +21,17 @@ Puis lance Android Studio, laisse l'assistant installer le SDK, ouvre le dossier
 | Mock (défaut) | `docker compose up -d` puis `./scripts/dev-reverse.sh` | `http://localhost:4010/` |
 | Vrai service d'auth | `docker compose up -d` dans `pawrise-auth`, puis `adb reverse tcp:3000 tcp:3000` | `-Ppawrise.apiBaseUrl=http://localhost:3000/` |
 
-Le mock (Prism) sert les `example` de `api/openapi.yaml`. `adb reverse` fait pointer `localhost` du téléphone ou de l'émulateur vers ta machine. Pour changer d'URL de façon durable, ajoute `pawrise.apiBaseUrl=…` dans `~/.gradle/gradle.properties`.
+Le mock (Prism) sert les `example` de `api/openapi.yaml`, traduction OpenAPI de `pawrise-auth/docs/api-contract.md` (le `.md` fait foi). Pour tester un état d'erreur d'écran, ajoute l'en-tête `Prefer` à la requête (intercepteur OkHttp de debug, ou curl) :
+
+```bash
+curl -H 'Content-Type: application/json' -H 'Prefer: code=423' \
+     -d '{"email":"alex@example.com","password":"x"}' localhost:4010/v1/auth/login   # account_locked
+# Prefer: code=409                               → email_taken (register)
+# Prefer: code=422, example=password_breached    → exemple nommé
+```
+
+Une requête hors schéma (mot de passe < 8 caractères, champ manquant…) reçoit le premier exemple 422 de la route. Les routes Bearer répondent 401 sans en-tête `Authorization`.
+ `adb reverse` fait pointer `localhost` du téléphone ou de l'émulateur vers ta machine. Pour changer d'URL de façon durable, ajoute `pawrise.apiBaseUrl=…` dans `~/.gradle/gradle.properties`.
 
 ### 3. Build
 
