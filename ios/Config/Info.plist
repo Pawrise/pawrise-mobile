@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>PawriseAuthMode</key>
+	<string>$(PAWRISE_AUTH_MODE)</string>
+	<key>PawriseAPIBaseURL</key>
+	<string>$(PAWRISE_API_BASE_URL)</string>
+	<key>PawriseAssistantBaseURL</key>
+	<string>$(PAWRISE_ASSISTANT_BASE_URL)</string>
+	<key>PawriseAssistantPetRef</key>
+	<string>$(PAWRISE_ASSISTANT_PET_REF)</string>
+	<key>GIDClientID</key>
+	<string>$(GOOGLE_CLIENT_ID)</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>$(GOOGLE_REVERSED_CLIENT_ID)</string>
+			</array>
+		</dict>
+	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>La caméra sert à scanner le QR code du collier Pawrise.</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>En développement, l'app contacte l'assistant Pawrise sur votre réseau local.</string>
+</dict>
+</plist>
