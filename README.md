@@ -9,7 +9,7 @@ Maquettes : [Figma Pawrise-App](https://www.figma.com/design/33w6Fklug8ywPYh6aDN
 ### 1. Poste de dev (une fois)
 
 ```bash
-sudo ./scripts/setup-host.sh   # JDK 21, Android Studio (snap), groupe kvm, ANDROID_HOME
+sudo ./scripts/setup-host.sh   # JDK 21, Android Studio (/opt/android-studio), groupe kvm, ANDROID_HOME
 ```
 
 Puis lance Android Studio, laisse l'assistant installer le SDK, ouvre le dossier `android/` et crée un émulateur (ou branche un téléphone en débogage USB).
