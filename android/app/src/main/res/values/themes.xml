@@ -1,0 +1,7 @@
+<resources>
+    <!-- Thème de fenêtre minimal : tout le reste est géré par PawriseTheme (Compose). -->
+    <style name="Theme.Pawrise" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/pw_surface_page</item>
+    </style>
+    <color name="pw_surface_page">#F4F8FB</color>
+</resources>
