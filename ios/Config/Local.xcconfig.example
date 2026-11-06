@@ -1,0 +1,6 @@
+// Copier en Config/Local.xcconfig (ignoré par git) pour surcharger localement.
+// GOOGLE_CLIENT_ID = 1234567890-abc.apps.googleusercontent.com
+// GOOGLE_REVERSED_CLIENT_ID = com.googleusercontent.apps.1234567890-abc
+// PAWRISE_ASSISTANT_BASE_URL = http:/$()/192.168.1.20:8100
+// PAWRISE_AUTH_MODE = remote
+// DEVELOPMENT_TEAM = ABCDE12345

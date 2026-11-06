@@ -1,0 +1,8 @@
+#include "Shared.xcconfig"
+
+PAWRISE_AUTH_MODE = remote
+PAWRISE_API_BASE_URL = https:/$()/api.pawrise.fr
+PAWRISE_ASSISTANT_BASE_URL = https:/$()/api.pawrise.fr
+PAWRISE_ASSISTANT_PET_REF =
+
+#include? "Local.xcconfig"
