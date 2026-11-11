@@ -19,6 +19,12 @@ plugins {
 // contre le mock Prism (api/openapi.yaml). Sans la propriété, ils sont ignorés.
 subprojects {
     tasks.withType<Test>().configureEach {
+        // Robolectric (écrans Compose sur la JVM) lit des internes du JDK 21.
+        jvmArgs(
+            "--add-exports=java.base/jdk.internal.access=ALL-UNNAMED",
+            "--add-opens=java.base/java.io=ALL-UNNAMED",
+            "--add-opens=java.base/java.lang=ALL-UNNAMED",
+        )
         val contractUrl = providers.gradleProperty("pawrise.contractUrl")
         inputs.property("pawrise.contractUrl", contractUrl.orElse(""))
         contractUrl.orNull?.let { systemProperty("pawrise.contractUrl", it) }
