@@ -13,6 +13,7 @@ import com.pawrise.core.designsystem.component.PlaceholderScreen
 import com.pawrise.feature.auth.LoginRoute
 import com.pawrise.feature.auth.SignupRoute
 import com.pawrise.feature.auth.WelcomeRoute
+import com.pawrise.feature.onboarding.LearnFlowRoute
 import kotlinx.coroutines.flow.Flow
 
 @Composable
@@ -57,7 +58,7 @@ fun PawriseNavDisplay(initialSession: SessionState, session: Flow<SessionState>)
                     onRegistered = { backStack.resetTo(LearnFlow) },
                 )
             }
-            entry<LearnFlow> { PlaceholderScreen("03-07 · Découverte (LearnFlow)") }
+            entry<LearnFlow> { LearnFlowRoute(onDone = { backStack.add(AddDogFlow) }) }
             entry<AddDogFlow> { PlaceholderScreen("08-20 · Profil du chien et collier (AddDogFlow)") }
             entry<Home> { PlaceholderScreen("Homepage · Santé") }
         },
