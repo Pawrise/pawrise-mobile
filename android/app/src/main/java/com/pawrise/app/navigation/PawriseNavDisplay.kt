@@ -11,6 +11,7 @@ import androidx.navigation3.ui.NavDisplay
 import com.pawrise.core.auth.SessionState
 import com.pawrise.core.designsystem.component.PlaceholderScreen
 import com.pawrise.feature.auth.LoginRoute
+import com.pawrise.feature.auth.SignupRoute
 import com.pawrise.feature.auth.WelcomeRoute
 import kotlinx.coroutines.flow.Flow
 
@@ -49,7 +50,13 @@ fun PawriseNavDisplay(initialSession: SessionState, session: Flow<SessionState>)
                     onLoggedIn = { backStack.resetTo(Home) },
                 )
             }
-            entry<Signup> { PlaceholderScreen("02 · Créer un compte (US-A)") }
+            entry<Signup> {
+                SignupRoute(
+                    onBack = { backStack.removeLastOrNull() },
+                    onLogin = { backStack.replaceTop(Login) },
+                    onRegistered = { backStack.resetTo(LearnFlow) },
+                )
+            }
             entry<LearnFlow> { PlaceholderScreen("03-07 · Découverte (LearnFlow)") }
             entry<AddDogFlow> { PlaceholderScreen("08-20 · Profil du chien et collier (AddDogFlow)") }
             entry<Home> { PlaceholderScreen("Homepage · Santé") }
