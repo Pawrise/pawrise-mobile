@@ -67,7 +67,7 @@ class LoginFlowTest {
         compose.tap("Se connecter")
         compose.tap("Créer un compte")
 
-        compose.onNodeWithText("Créer un compte (US-A)", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("Quelques informations, puis on vous montre Pawrise.").assertIsDisplayed()
     }
 
     @Test
