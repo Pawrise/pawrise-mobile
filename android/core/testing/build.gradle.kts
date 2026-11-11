@@ -14,5 +14,6 @@ android {
 
 dependencies {
     api(project(":core:auth"))
+    api(project(":core:pets"))
     api(libs.kotlinx.coroutines.test)
 }
