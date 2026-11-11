@@ -1,0 +1,13 @@
+# Lu automatiquement par gitleaks (scan de secrets de la CI).
+# Valeurs d'exemple du contrat pawrise-doc reprises dans le mock, les tests et le README :
+# ce ne sont pas des secrets (nouveau-chien-2026 : tests de la branche iOS).
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Valeurs d'exemple du contrat d'interface"
+regexes = [
+  '''^chien-oslo-2026$''',
+  '''^nouveau-chien-2026$''',
+  '''^prt_(9kLm2Wv7|4bS0n9xQ)$''',
+]

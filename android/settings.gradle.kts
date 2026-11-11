@@ -25,6 +25,7 @@ rootProject.name = "pawrise"
 include(":app")
 include(":core:designsystem")
 include(":core:network")
+include(":core:auth")
 include(":feature:auth")
 include(":feature:onboarding")
 include(":feature:dogprofile")

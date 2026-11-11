@@ -19,9 +19,17 @@ Puis lance Android Studio, laisse l'assistant installer le SDK, ouvre le dossier
 | Mode | Commande | URL vue par l'app |
 |---|---|---|
 | Mock (défaut) | `docker compose up -d` puis `./scripts/dev-reverse.sh` | `http://localhost:4010/` |
-| Vrai service d'auth | `docker compose up -d` dans `pawrise-auth`, puis `adb reverse tcp:3000 tcp:3000` | `-Ppawrise.apiBaseUrl=http://localhost:3000/` |
+| API réelle | selon l'équipe backend, puis `adb reverse` sur son port | `-Ppawrise.apiBaseUrl=http://localhost:<port>/v1/` |
 
-Le mock (Prism) sert les `example` de `api/openapi.yaml`. `adb reverse` fait pointer `localhost` du téléphone ou de l'émulateur vers ta machine. Pour changer d'URL de façon durable, ajoute `pawrise.apiBaseUrl=…` dans `~/.gradle/gradle.properties`.
+Le mock (Prism) sert `api/openapi.yaml`, copie du contrat qui fait foi : `pawrise-doc/contrat-interface/openapi.yaml` (`./scripts/sync-contract.sh` la met à jour). Il **valide les requêtes** : un champ mal nommé ou manquant est refusé. Pour tester un état d'erreur d'écran, ajoute l'en-tête `Prefer` :
+
+```bash
+curl -H 'Content-Type: application/json' -H 'Prefer: code=409' \
+     -d '{"firstName":"C","lastName":"M","email":"c@example.com","password":"chien-oslo-2026","acceptedTermsVersion":"2026-10"}' \
+     localhost:4010/auth/register    # EMAIL_ALREADY_USED
+```
+
+Les routes Bearer répondent 401 sans en-tête `Authorization`. Les chemins sont ceux du contrat (`/auth/login`) ; en production l'URL de base se termine par `/v1/` (convention 7).
 
 ### 3. Build
 
@@ -29,13 +37,14 @@ Le mock (Prism) sert les `example` de `api/openapi.yaml`. `adb reverse` fait poi
 cd android
 ./gradlew assembleDebug          # build
 ./gradlew installDebug           # installe sur l'émulateur / le téléphone
-./gradlew lint testDebugUnitTest # ce que lance la CI
+./gradlew lint testDebugUnitTest # tests JVM
+./gradlew testDebugUnitTest -Ppawrise.contractUrl=http://localhost:4010/  # + tests de contrat (mock lancé)
 ```
 
 Sans JDK ni SDK sur la machine, le même build tourne dans Docker :
 
 ```bash
-docker compose run --rm android ./gradlew assembleDebug
+docker compose run --rm android assembleDebug
 ```
 
 ## Structure
@@ -44,11 +53,12 @@ docker compose run --rm android ./gradlew assembleDebug
 android/
   app/                  Activity, navigation (Navigation 3), injection (Hilt)
   core/designsystem/    Thème Pawrise : jetons --pw-*, polices, composants partagés
-  core/network/         Retrofit + OkHttp + kotlinx.serialization
+  core/network/         Retrofit + OkHttp + kotlinx.serialization, erreurs Problem Details
+  core/auth/            Session : AuthRepository, jetons chiffrés (Keystore), refresh unique sur 401
   feature/auth/         Bienvenue, connexion, inscription
   feature/onboarding/   Découverte en 5 étapes (LearnFlow)
   feature/dogprofile/   Profil du chien et association du collier (AddDogFlow)
-api/openapi.yaml        Contrat servi par le mock
+api/openapi.yaml        Copie du contrat pawrise-doc, servie par le mock
 docker/                 Image de build Android (JDK 21 + SDK 37)
 ```
 

@@ -1,17 +1,30 @@
 package com.pawrise.app.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
+import com.pawrise.core.auth.SessionState
 import com.pawrise.core.designsystem.component.PlaceholderScreen
 import com.pawrise.feature.auth.WelcomeRoute
+import kotlinx.coroutines.flow.Flow
 
 @Composable
-fun PawriseNavDisplay() {
-    val backStack = rememberNavBackStack(Welcome)
+fun PawriseNavDisplay(initialSession: SessionState, session: Flow<SessionState>) {
+    val backStack = rememberNavBackStack(if (initialSession == SessionState.SignedIn) Home else Welcome)
+
+    // Session perdue (refresh refusé, déconnexion) → retour à Bienvenue, historique vidé.
+    LaunchedEffect(session) {
+        session.collect { state ->
+            if (state == SessionState.SignedOut && backStack.lastOrNull() !in AUTH_DESTINATIONS) {
+                backStack.clear()
+                backStack.add(Welcome)
+            }
+        }
+    }
 
     NavDisplay(
         backStack = backStack,
@@ -36,3 +49,6 @@ fun PawriseNavDisplay() {
         },
     )
 }
+
+/** Écrans accessibles sans session : on n'y force pas de retour à Bienvenue. */
+private val AUTH_DESTINATIONS = setOf(Welcome, Login, Signup)

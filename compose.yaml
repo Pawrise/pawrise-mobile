@@ -25,7 +25,11 @@ services:
       - ./:/workspace
       - gradle-cache:/home/builder/.gradle
     working_dir: /workspace/android
-    command: ./gradlew assembleDebug
+    environment:
+      PAWRISE_DOCKER_BUILD: "1"
+    # --project-cache-dir : cache Gradle du projet séparé de celui d'Android Studio (android/.gradle).
+    entrypoint: ["./gradlew", "--project-cache-dir=.docker-build/.gradle"]
+    command: ["assembleDebug"]
 
 volumes:
   gradle-cache:
