@@ -14,7 +14,9 @@ import com.pawrise.core.designsystem.component.PlaceholderScreen
 import com.pawrise.feature.auth.LoginRoute
 import com.pawrise.feature.auth.SignupRoute
 import com.pawrise.feature.auth.WelcomeRoute
+import com.pawrise.feature.collar.CollarPairingRoute
 import com.pawrise.feature.dogprofile.AddDogRoute
+import com.pawrise.feature.dogprofile.decodePhotoChoice
 import com.pawrise.feature.dogprofile.encode
 import com.pawrise.feature.onboarding.LearnFlowRoute
 import kotlinx.coroutines.flow.Flow
@@ -75,7 +77,14 @@ fun PawriseNavDisplay(
                     onCreated = { dog -> backStack.resetTo(CollarPairing(dog.petId, dog.name, dog.photo.encode())) },
                 )
             }
-            entry<CollarPairing> { PlaceholderScreen("17-20 · Associer le collier de ${it.petName}") }
+            entry<CollarPairing> { key ->
+                CollarPairingRoute(
+                    petId = key.petId,
+                    petName = key.petName,
+                    photo = decodePhotoChoice(key.photo),
+                    onDone = { backStack.resetTo(Home) },
+                )
+            }
             entry<Home> { PlaceholderScreen("Homepage · Santé") }
         },
     )

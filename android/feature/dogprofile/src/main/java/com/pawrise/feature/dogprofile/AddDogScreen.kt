@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.pawrise.core.designsystem.component.PwFieldError
+import com.pawrise.core.designsystem.component.PwFlowHeader
 import com.pawrise.core.designsystem.component.PwIcons
 import com.pawrise.core.designsystem.component.PwPrimaryButton
 import com.pawrise.core.designsystem.theme.PwColors
@@ -104,7 +105,7 @@ internal data class AddDogActions(
 @Composable
 internal fun AddDogScreen(state: AddDogUiState, actions: AddDogActions) {
     Column(Modifier.fillMaxSize().safeDrawingPadding().imePadding()) {
-        FlowHeader(onBack = actions.onBack, onClose = actions.onClose) { StepProgress(state.step) }
+        PwFlowHeader(onBack = actions.onBack, onClose = actions.onClose) { StepProgress(state.step) }
         Box(Modifier.weight(1f).padding(horizontal = PwSpacing.Section)) {
             AddDogStepContent(state, actions)
         }
@@ -126,29 +127,6 @@ internal fun AddDogScreen(state: AddDogUiState, actions: AddDogActions) {
             )
         }
     }
-}
-
-/** En-tête des parcours plein écran : retour rond, contenu central, fermer rond. */
-@Composable
-fun FlowHeader(onBack: () -> Unit, onClose: () -> Unit, center: @Composable () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().padding(horizontal = PwSpacing.Page, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        RoundIconButton(PwIcons.ChevronLeft, "Retour", onBack)
-        Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { center() }
-        RoundIconButton(PwIcons.Close, "Fermer", onClose)
-    }
-}
-
-@Composable
-private fun RoundIconButton(icon: ImageVector, label: String, onClick: () -> Unit) {
-    IconButton(
-        onClick = onClick,
-        colors = IconButtonDefaults.iconButtonColors(containerColor = PwColors.SurfaceCard),
-        modifier = Modifier.size(40.dp),
-    ) { Icon(icon, contentDescription = label, modifier = Modifier.size(18.dp)) }
 }
 
 /** Barre segmentée (9 étapes). */

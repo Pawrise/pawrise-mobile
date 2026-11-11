@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pawrise.core.designsystem.component.PwFieldError
 import com.pawrise.core.designsystem.component.PwIcons
+import com.pawrise.core.designsystem.component.PwQuestion
 import com.pawrise.core.designsystem.theme.PwColors
 import com.pawrise.core.designsystem.theme.PwRadius
 import com.pawrise.core.pets.SamplePhoto
@@ -60,18 +61,18 @@ internal fun AddDogStepContent(state: AddDogUiState, actions: AddDogActions) {
     val dog = state.dogName
     when (state.step) {
         AddDogStep.Photo -> Scrollable {
-            Question("Ajoutez une photo de votre chien")
+            PwQuestion("Ajoutez une photo de votre chien")
             PhotoStep(state, actions)
         }
         AddDogStep.Name -> Scrollable {
-            Question("Comment s'appelle votre chien ?")
+            PwQuestion("Comment s'appelle votre chien ?")
             QuestionField(
                 value = state.name, onValueChange = actions.onName, a11yLabel = "Nom du chien", placeholder = "Ex. Rio",
                 keyboard = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
             )
         }
         AddDogStep.BirthDate -> Scrollable {
-            Question(
+            PwQuestion(
                 "Quand est né${if (state.sex == Sex.Female) "e" else ""} $dog ?",
                 "Si vous ne connaissez pas la date exacte, vous pouvez indiquer une date approximative.",
             )
@@ -82,7 +83,7 @@ internal fun AddDogStepContent(state: AddDogUiState, actions: AddDogActions) {
             )
         }
         AddDogStep.Sex -> Scrollable {
-            Question("$dog est…")
+            PwQuestion("$dog est…")
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 SexCard("Femelle", PwIcons.Female, state.sex == Sex.Female, Modifier.weight(1f)) { actions.onSex(Sex.Female) }
                 SexCard("Mâle", PwIcons.Male, state.sex == Sex.Male, Modifier.weight(1f)) { actions.onSex(Sex.Male) }
@@ -90,15 +91,15 @@ internal fun AddDogStepContent(state: AddDogUiState, actions: AddDogActions) {
         }
         AddDogStep.Breed -> BreedStep(state, actions)
         AddDogStep.Weight -> Scrollable {
-            Question("Combien pèse $dog ?", "Un poids approximatif suffit.")
+            PwQuestion("Combien pèse $dog ?", "Un poids approximatif suffit.")
             UnitField(state.weight, actions.onWeight, "kg", "Poids en kilogrammes")
         }
         AddDogStep.Height -> Scrollable {
-            Question("Quelle est la taille de $dog ?", "Au garrot, en centimètres. Une mesure approximative est acceptée.")
+            PwQuestion("Quelle est la taille de $dog ?", "Au garrot, en centimètres. Une mesure approximative est acceptée.")
             UnitField(state.height, actions.onHeight, "cm", "Taille en centimètres")
         }
         AddDogStep.Medical -> Scrollable {
-            Question(
+            PwQuestion(
                 "Y a-t-il quelque chose d'important à savoir sur la santé de $dog ?",
                 "Optionnel — conditions connues, traitements, allergies, antécédents… Ces informations pourront aider votre vétérinaire plus tard.",
             )
@@ -115,17 +116,6 @@ internal fun AddDogStepContent(state: AddDogUiState, actions: AddDogActions) {
 @Composable
 private fun Scrollable(content: @Composable () -> Unit) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) { content() }
-}
-
-@Composable
-internal fun Question(title: String, hint: String? = null) {
-    Column(Modifier.padding(top = 16.dp, bottom = 24.dp)) {
-        Text(title, style = MaterialTheme.typography.headlineMedium)
-        if (hint != null) {
-            Spacer(Modifier.height(8.dp))
-            Text(hint, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
 }
 
 @Composable
@@ -242,7 +232,7 @@ private fun SexCard(label: String, icon: ImageVector, selected: Boolean, modifie
 @Composable
 private fun BreedStep(state: AddDogUiState, actions: AddDogActions) {
     Column(Modifier.fillMaxSize()) {
-        Question("Quelle est la race de ${state.dogName} ?")
+        PwQuestion("Quelle est la race de ${state.dogName} ?")
         OutlinedTextField(
             value = state.breedQuery,
             onValueChange = actions.onBreedQuery,
@@ -309,7 +299,7 @@ internal fun Double.toFrench(): String =
 
 @Composable
 private fun Summary(state: AddDogUiState, onEdit: (AddDogStep) -> Unit) {
-    Question("Le profil de ${state.dogName}", "Vérifiez les informations avant de continuer.")
+    PwQuestion("Le profil de ${state.dogName}", "Vérifiez les informations avant de continuer.")
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         PetPhoto(state.photo, "Photo de ${state.dogName}", Modifier.size(96.dp).clip(RoundedCornerShape(24.dp)))
         Spacer(Modifier.height(12.dp))

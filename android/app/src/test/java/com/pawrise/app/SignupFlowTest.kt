@@ -3,6 +3,8 @@ package com.pawrise.app
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
@@ -26,6 +28,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
 /** US-A, inscription dans l'app réelle : Bienvenue → Créer un compte → découverte. */
+@OptIn(ExperimentalTestApi::class)
 @HiltAndroidTest
 @UninstallModules(AuthBindings::class, PetBindings::class)
 @RunWith(RobolectricTestRunner::class)
@@ -80,8 +83,22 @@ class SignupFlowTest {
         repeat(5) { compose.tap("Suivant") }
         compose.tap("Continuer")
 
-        compose.onNodeWithText("Associer le collier de Nala", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("Connectons le collier de Nala").assertIsDisplayed()
         assertEquals("Nala", (petRepository as FakePetRepository).created.single().name)
+
+        compose.tap("Saisir le code manuellement")
+        compose.onNode(hasSetTextAction() and hasContentDescription("Code du collier")).performTextInput("PW-8A4F2C")
+        compose.tap("Activer le collier")
+        compose.waitUntilAtLeastOneExists(hasText("Le collier de Nala est activé"), 5_000)
+        assertEquals(listOf("pet-new" to "PW-8A4F2C"), petRepository.collars)
+
+        compose.tap("Voir le tableau de bord de Nala")
+        compose.onNodeWithText("Homepage · Santé", substring = true).assertIsDisplayed()
+
+        // Parcours terminé : le retour système ne rouvre pas l'onboarding.
+        compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
+        compose.waitForIdle()
+        compose.onNodeWithText("Le collier de Nala est activé").assertDoesNotExist()
     }
 
     @Test
