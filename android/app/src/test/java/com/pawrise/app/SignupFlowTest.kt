@@ -42,7 +42,8 @@ class SignupFlowTest {
     fun `inscription puis decouverte`() {
         signUp()
 
-        compose.onNodeWithText("Découverte", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("Pawrise veille sur votre chien").assertIsDisplayed()
+        compose.onNodeWithText("Étape 1 sur 5").assertIsDisplayed()
     }
 
     @Test
@@ -53,6 +54,15 @@ class SignupFlowTest {
         compose.waitForIdle()
 
         compose.onNodeWithText("Créer un compte").assertDoesNotExist()
+    }
+
+    @Test
+    fun `decouverte puis profil du chien`() {
+        signUp()
+        repeat(4) { compose.tap("Suivant") }
+        compose.tap("Connecter le collier")
+
+        compose.onNodeWithText("Profil du chien", substring = true).assertIsDisplayed()
     }
 
     @Test
