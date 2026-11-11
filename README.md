@@ -37,7 +37,7 @@ Les routes Bearer répondent 401 sans en-tête `Authorization`. Les chemins sont
 cd android
 ./gradlew assembleDebug          # build
 ./gradlew installDebug           # installe sur l'émulateur / le téléphone
-./gradlew lint testDebugUnitTest # tests JVM
+./gradlew lint testDebugUnitTest # tests JVM (écrans via Robolectric : pas d'émulateur)
 ./gradlew testDebugUnitTest -Ppawrise.contractUrl=http://localhost:4010/  # + tests de contrat (mock lancé)
 ```
 
@@ -55,9 +55,12 @@ android/
   core/designsystem/    Thème Pawrise : jetons --pw-*, polices, composants partagés
   core/network/         Retrofit + OkHttp + kotlinx.serialization, erreurs Problem Details
   core/auth/            Session : AuthRepository, jetons chiffrés (Keystore), refresh unique sur 401
-  feature/auth/         Bienvenue, connexion, inscription
-  feature/onboarding/   Découverte en 5 étapes (LearnFlow)
-  feature/dogprofile/   Profil du chien et association du collier (AddDogFlow)
+  core/pets/            Chiens, races, photo, collier (PetRepository)
+  core/testing/         Faux dépôts pour les tests (testImplementation uniquement)
+  feature/auth/         US-J connexion ; US-A Bienvenue et inscription
+  feature/onboarding/   US-A découverte en 5 étapes (LearnFlow)
+  feature/dogprofile/   US-A profil du chien (AddDogFlow, écrans 08-16)
+  feature/collar/       US-A association du collier : QR (CameraX + ML Kit) ou saisie (17-20)
 api/openapi.yaml        Copie du contrat pawrise-doc, servie par le mock
 docker/                 Image de build Android (JDK 21 + SDK 37)
 ```
