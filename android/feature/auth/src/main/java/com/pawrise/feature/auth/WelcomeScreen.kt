@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.pawrise.core.designsystem.component.PawriseMark
 import com.pawrise.core.designsystem.component.PwPrimaryButton
 import com.pawrise.core.designsystem.component.PwSecondaryButton
 import com.pawrise.core.designsystem.theme.PawriseTheme
@@ -44,8 +45,10 @@ internal fun WelcomeScreen(onLogin: () -> Unit, onSignup: () -> Unit, modifier: 
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            // TODO: remplacer par le logo Pawrise (export SVG depuis Figma → vector drawable).
-            Box(Modifier.size(80.dp).background(PwColors.SurfaceElevated, PwRadius.Card))
+            Box(
+                Modifier.size(80.dp).background(PwColors.SurfaceElevated, PwRadius.Card),
+                contentAlignment = Alignment.Center,
+            ) { PawriseMark(size = 48.dp) }
             Spacer(Modifier.height(PwSpacing.Section))
             Text("Pawrise", style = MaterialTheme.typography.displaySmall)
             Spacer(Modifier.height(PwSpacing.Section))
