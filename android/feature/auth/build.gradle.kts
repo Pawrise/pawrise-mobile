@@ -21,7 +21,7 @@ android {
 
 dependencies {
     implementation(project(":core:designsystem"))
-    implementation(project(":core:network"))
+    implementation(project(":core:auth"))
 
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)

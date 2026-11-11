@@ -5,7 +5,8 @@ plugins {
     alias(libs.plugins.hilt)
 }
 
-// URL de l'API. Par défaut : le mock Prism du docker compose, joint via `adb reverse tcp:4010 tcp:4010`.
+// URL de base de l'API (chemins du contrat relatifs : « auth/login »…). Prod : https://…/v1/ (convention 7).
+// Par défaut : le mock Prism du docker compose, joint via `adb reverse tcp:4010 tcp:4010`.
 // Surcharge : `./gradlew assembleDebug -Ppawrise.apiBaseUrl=https://…/` ou dans ~/.gradle/gradle.properties.
 val apiBaseUrl = providers.gradleProperty("pawrise.apiBaseUrl").getOrElse("http://localhost:4010/")
 
@@ -35,4 +36,6 @@ dependencies {
     ksp(libs.hilt.compiler)
 
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.okhttp.mockwebserver)
 }
