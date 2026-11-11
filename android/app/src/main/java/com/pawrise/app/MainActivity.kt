@@ -21,9 +21,15 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             PawriseTheme {
-                val initialSession by viewModel.initialSession.collectAsStateWithLifecycle()
-                // Rien à l'écran pendant la relecture de la session (quelques ms, fond = surface-page).
-                initialSession?.let { PawriseNavDisplay(initialSession = it, session = viewModel.session) }
+                val start by viewModel.startDestination.collectAsStateWithLifecycle()
+                // Rien à l'écran pendant la relecture de la session (fond = surface-page).
+                start?.let {
+                    PawriseNavDisplay(
+                        startDestination = it,
+                        session = viewModel.session,
+                        destinationAfterSignIn = viewModel::destinationAfterSignIn,
+                    )
+                }
             }
         }
     }

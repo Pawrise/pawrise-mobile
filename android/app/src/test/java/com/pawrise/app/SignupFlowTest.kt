@@ -1,17 +1,25 @@
 package com.pawrise.app
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import com.pawrise.core.auth.AuthRepository
 import com.pawrise.core.auth.di.AuthBindings
+import com.pawrise.core.pets.PetRepository
+import com.pawrise.core.pets.di.PetBindings
 import com.pawrise.core.testing.FakeAuthRepository
+import com.pawrise.core.testing.FakePetRepository
 import dagger.hilt.android.testing.BindValue
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import dagger.hilt.android.testing.UninstallModules
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -19,7 +27,7 @@ import org.robolectric.RobolectricTestRunner
 
 /** US-A, inscription dans l'app réelle : Bienvenue → Créer un compte → découverte. */
 @HiltAndroidTest
-@UninstallModules(AuthBindings::class)
+@UninstallModules(AuthBindings::class, PetBindings::class)
 @RunWith(RobolectricTestRunner::class)
 class SignupFlowTest {
 
@@ -27,6 +35,7 @@ class SignupFlowTest {
     @get:Rule(order = 1) val compose = createAndroidComposeRule<MainActivity>()
 
     @BindValue @JvmField val repository: AuthRepository = FakeAuthRepository()
+    @BindValue @JvmField val petRepository: PetRepository = FakePetRepository(pets = emptyList())
 
     private fun signUp() {
         compose.tap("Créer un compte")
@@ -57,12 +66,34 @@ class SignupFlowTest {
     }
 
     @Test
-    fun `decouverte puis profil du chien`() {
+    fun `inscription, decouverte, profil du chien puis collier`() {
         signUp()
         repeat(4) { compose.tap("Suivant") }
         compose.tap("Connecter le collier")
 
-        compose.onNodeWithText("Profil du chien", substring = true).assertIsDisplayed()
+        compose.onNodeWithContentDescription("Exemple de photo 1").performClick()
+        compose.tap("Suivant")
+        compose.onNode(hasSetTextAction() and hasContentDescription("Nom du chien")).performTextInput("Nala")
+        compose.tap("Suivant")
+        compose.tap("Suivant")
+        compose.tap("Femelle")
+        repeat(5) { compose.tap("Suivant") }
+        compose.tap("Continuer")
+
+        compose.onNodeWithText("Associer le collier de Nala", substring = true).assertIsDisplayed()
+        assertEquals("Nala", (petRepository as FakePetRepository).created.single().name)
+    }
+
+    @Test
+    fun `fermer l'ajout du chien pendant l'inscription revient a la decouverte`() {
+        signUp()
+        repeat(4) { compose.tap("Suivant") }
+        compose.tap("Connecter le collier")
+
+        compose.onNodeWithContentDescription("Fermer").performClick()
+        compose.waitForIdle()
+
+        compose.onNodeWithText("Suivez sa position").assertIsDisplayed()
     }
 
     @Test

@@ -6,7 +6,10 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performTextInput
 import com.pawrise.core.auth.AuthRepository
 import com.pawrise.core.auth.di.AuthBindings
+import com.pawrise.core.pets.PetRepository
+import com.pawrise.core.pets.di.PetBindings
 import com.pawrise.core.testing.FakeAuthRepository
+import com.pawrise.core.testing.FakePetRepository
 import dagger.hilt.android.testing.BindValue
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
@@ -18,7 +21,7 @@ import org.robolectric.RobolectricTestRunner
 
 /** US-J de bout en bout dans l'app réelle (MainActivity, navigation, Hilt) ; seul le serveur est simulé. */
 @HiltAndroidTest
-@UninstallModules(AuthBindings::class)
+@UninstallModules(AuthBindings::class, PetBindings::class)
 @RunWith(RobolectricTestRunner::class)
 class LoginFlowTest {
 
@@ -26,7 +29,19 @@ class LoginFlowTest {
     @get:Rule(order = 1) val compose = createAndroidComposeRule<MainActivity>()
 
     @BindValue @JvmField val repository: AuthRepository = FakeAuthRepository()
+    @BindValue @JvmField val petRepository: PetRepository = FakePetRepository()
     private val fake get() = repository as FakeAuthRepository
+
+    @Test
+    fun `compte sans chien - connexion mene a l'ajout du chien`() {
+        (petRepository as FakePetRepository).pets = emptyList()
+        compose.tap("Se connecter")
+        compose.field("E-mail").performTextInput("camille.martin@example.com")
+        compose.field("Mot de passe").performTextInput("chien-oslo-2026")
+        compose.tap("Se connecter")
+
+        compose.onNodeWithText("Ajoutez une photo de votre chien").assertIsDisplayed()
+    }
 
     @Test
     fun `bienvenue, connexion puis homepage`() {

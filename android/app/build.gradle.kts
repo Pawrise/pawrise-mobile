@@ -54,6 +54,7 @@ dependencies {
     implementation(project(":core:designsystem"))
     implementation(project(":core:network"))
     implementation(project(":core:auth"))
+    implementation(project(":core:pets"))
     implementation(project(":feature:auth"))
     implementation(project(":feature:onboarding"))
     implementation(project(":feature:dogprofile"))

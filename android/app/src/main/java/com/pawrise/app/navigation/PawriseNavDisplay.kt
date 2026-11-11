@@ -2,6 +2,7 @@ package com.pawrise.app.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
@@ -13,12 +14,20 @@ import com.pawrise.core.designsystem.component.PlaceholderScreen
 import com.pawrise.feature.auth.LoginRoute
 import com.pawrise.feature.auth.SignupRoute
 import com.pawrise.feature.auth.WelcomeRoute
+import com.pawrise.feature.dogprofile.AddDogRoute
+import com.pawrise.feature.dogprofile.encode
 import com.pawrise.feature.onboarding.LearnFlowRoute
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.launch
 
 @Composable
-fun PawriseNavDisplay(initialSession: SessionState, session: Flow<SessionState>) {
-    val backStack = rememberNavBackStack(if (initialSession == SessionState.SignedIn) Home else Welcome)
+fun PawriseNavDisplay(
+    startDestination: NavKey,
+    session: Flow<SessionState>,
+    destinationAfterSignIn: suspend () -> NavKey,
+) {
+    val backStack = rememberNavBackStack(startDestination)
+    val scope = rememberCoroutineScope()
 
     // Session perdue (refresh refusé, déconnexion) → retour à Bienvenue, historique vidé.
     LaunchedEffect(session) {
@@ -48,7 +57,7 @@ fun PawriseNavDisplay(initialSession: SessionState, session: Flow<SessionState>)
                 LoginRoute(
                     onBack = { backStack.removeLastOrNull() },
                     onSignup = { backStack.replaceTop(Signup) },
-                    onLoggedIn = { backStack.resetTo(Home) },
+                    onLoggedIn = { scope.launch { backStack.resetTo(destinationAfterSignIn()) } },
                 )
             }
             entry<Signup> {
@@ -59,7 +68,14 @@ fun PawriseNavDisplay(initialSession: SessionState, session: Flow<SessionState>)
                 )
             }
             entry<LearnFlow> { LearnFlowRoute(onDone = { backStack.add(AddDogFlow) }) }
-            entry<AddDogFlow> { PlaceholderScreen("08-20 · Profil du chien et collier (AddDogFlow)") }
+            entry<AddDogFlow> {
+                AddDogRoute(
+                    // Pendant l'inscription : retour à la découverte. Compte repris sans chien : idem.
+                    onLeave = { if (backStack.size > 1) backStack.removeLastOrNull() else backStack.replaceTop(LearnFlow) },
+                    onCreated = { dog -> backStack.resetTo(CollarPairing(dog.petId, dog.name, dog.photo.encode())) },
+                )
+            }
+            entry<CollarPairing> { PlaceholderScreen("17-20 · Associer le collier de ${it.petName}") }
             entry<Home> { PlaceholderScreen("Homepage · Santé") }
         },
     )
