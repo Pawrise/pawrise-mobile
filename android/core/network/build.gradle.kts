@@ -5,9 +5,15 @@ plugins {
     alias(libs.plugins.hilt)
 }
 
-// URL de l'API. Par défaut : le mock Prism du docker compose, joint via `adb reverse tcp:4010 tcp:4010`.
+// URL de base de l'API (chemins du contrat relatifs : « auth/login »…). Prod : https://…/v1/ (convention 7).
+// API-CORE en local (port 3000, joint via `adb reverse tcp:3000 tcp:3000`).
 // Surcharge : `./gradlew assembleDebug -Ppawrise.apiBaseUrl=https://…/` ou dans ~/.gradle/gradle.properties.
-val apiBaseUrl = providers.gradleProperty("pawrise.apiBaseUrl").getOrElse("http://localhost:4010/")
+val apiBaseUrl = providers.gradleProperty("pawrise.apiBaseUrl").getOrElse("http://localhost:3000/v1/")
+
+// URL de base de pawrise-auth (routes /v1/auth/* et /v1/me*), chemins relatifs « auth/login », « me »… :
+// l'URL se termine donc par « /v1/ ». Par défaut le service lancé en local (port 8200, comme iOS),
+// joint via `adb reverse tcp:8200 tcp:8200`. Surcharge : `-Ppawrise.authBaseUrl=https://…/v1/`.
+val authBaseUrl = providers.gradleProperty("pawrise.authBaseUrl").getOrElse("http://localhost:8200/v1/")
 
 android {
     namespace = "com.pawrise.core.network"
@@ -16,6 +22,7 @@ android {
     defaultConfig {
         minSdk = 26
         buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
+        buildConfigField("String", "AUTH_BASE_URL", "\"$authBaseUrl\"")
     }
 
     buildFeatures {
@@ -35,4 +42,6 @@ dependencies {
     ksp(libs.hilt.compiler)
 
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.okhttp.mockwebserver)
 }

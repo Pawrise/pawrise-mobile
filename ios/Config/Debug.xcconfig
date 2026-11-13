@@ -1,0 +1,14 @@
+#include "Shared.xcconfig"
+
+// mock : comptes simulés dans l'app (pas besoin de pawrise-auth)
+// remote : appelle PAWRISE_API_BASE_URL (contrat : Pawrise/pawrise-auth/docs/api-contract.md)
+PAWRISE_AUTH_MODE = mock
+PAWRISE_API_BASE_URL = http:/$()/localhost:8200
+// API-CORE (chiens, photos, races, collier) en mode remote, version comprise (contrat pawrise-doc, convention 7)
+PAWRISE_CORE_BASE_URL = http:/$()/localhost:3000/v1
+// pawrise-assistant en local (uv run dev). Sur iPhone physique : IP du Mac, voir ios/README.md
+PAWRISE_ASSISTANT_BASE_URL = http:/$()/127.0.0.1:8100
+// Vide : l'app envoie l'id du chien courant (lu par l'assistant sur l'API-CORE). Forçable dans Local.xcconfig.
+PAWRISE_ASSISTANT_PET_REF =
+
+#include? "Local.xcconfig"

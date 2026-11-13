@@ -1,6 +1,18 @@
+# OS
+.DS_Store
+
+# Xcode / iOS
+xcuserdata/
+DerivedData/
+*.xcuserstate
+ios/Config/Local.xcconfig
+# SwiftPM
+.build/
+
 # Gradle / Android
 .gradle/
 build/
+.docker-build/
 local.properties
 *.apk
 *.aab
@@ -14,11 +26,9 @@ captures/
 *.iml
 .vscode/
 
-# OS
-.DS_Store
-
 # Secrets
 *.jks
 *.keystore
+!android/app/debug.keystore
 google-services.json
 .env

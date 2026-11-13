@@ -22,8 +22,15 @@ jobs:
           distribution: temurin
           java-version: "21"
       - uses: gradle/actions/setup-gradle@v6
-      - name: Lint, tests unitaires, build debug
-        run: ./gradlew lint testDebugUnitTest assembleDebug --stacktrace
+      - name: Mock du contrat d'API (Prism, api/openapi.yaml)
+        working-directory: .
+        run: |
+          docker run -d --name mock-api -p 4010:4010 -v "$PWD/api:/api:ro" \
+            stoplight/prism:5.15.10 mock -h 0.0.0.0 -m false /api/openapi.yaml
+          for i in $(seq 1 30); do curl -s -o /dev/null localhost:4010/me && exit 0; sleep 1; done
+          docker logs mock-api; exit 1
+      - name: Lint, tests unitaires et de contrat, build debug
+        run: ./gradlew lint testDebugUnitTest assembleDebug -Ppawrise.contractUrl=http://localhost:4010/ --stacktrace
       - uses: actions/upload-artifact@v7
         if: success()
         with:

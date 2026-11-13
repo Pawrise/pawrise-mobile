@@ -1,22 +1,2276 @@
-# Contrat d'interface de l'API Pawrise vu par l'app mobile.
-# PROVISOIRE : seul /health existe. À remplacer par le contrat de l'équipe backend
-# (inscription, connexion, refresh, profil chien, activation du collier).
+# Copie de pawrise-doc/contrat-interface/openapi.yaml (commit a1218f8), contrat qui fait foi pour l'app.
+# Ne pas modifier ici : ./scripts/sync-contract.sh recopie la dernière version.
+#
+# Mock (compose.yaml) : forcer une réponse avec l'en-tête « Prefer: code=409 » ou « Prefer: example=<nom> ».
+# Les routes Bearer répondent 401 sans en-tête Authorization (n'importe quel jeton passe).
 openapi: 3.1.0
 info:
-  title: Pawrise API (mock mobile)
-  version: 0.0.1
+  title: Pawrise API-CORE — app mobile
+  version: 0.1.0
+  description: |
+    Contrat entre l'app mobile propriétaire et l'API-CORE (sprint 1).
+    Conventions transverses : `conventions.md` (dates, identifiants, nommage, erreurs, pagination, en-têtes, versioning, énumérations, PATCH).
+    Un endpoint marqué `x-status: provisoire` dépend d'une question ouverte de `questions.md` (`x-depends-on`).
+servers:
+  - url: https://api.pawrise.example/v1
+    description: "Adresse à fixer (convention 7 : version dans l'URL)"
+
+tags:
+  - name: Compte
+    description: Inscription, connexion, profil, suppression (C3)
+  - name: Animaux
+    description: Liste, ajout, édition des chiens (C4)
+  - name: Colliers
+    description: Association, état, remplacement du collier (C5)
+  - name: Santé
+    description: Score, indicateurs, séries, rappels (C6)
+  - name: Localisation
+    description: Position, trajet, zones de sécurité (C7)
+  - name: Notifications
+    description: Liste, lu / non lu (C8)
+  - name: Chat
+    description: Chat avec l'IA Pawrise (C9)
+  - name: Partage
+    description: Propriétaires, invitations, rôle de chef (C10)
+
 paths:
-  /health:
-    get:
-      summary: Vérifie que le mock répond
+  /auth/register:
+    post:
+      tags: [Compte]
+      operationId: register
+      summary: Créer un compte propriétaire
+      description: |
+        Écran S20 Inscription (US-28). Crée le compte, enregistre l'acceptation des CGU dans la même transaction (RG11) et ouvre une session : l'app enchaîne sur la découverte (S21) sans reconnexion.
+
+        Règles appliquées :
+        - RG10 : e-mail unique, sans tenir compte de la casse → 409 `EMAIL_ALREADY_USED`.
+        - RG11 : acceptation des CGU obligatoire, enregistrée dans `consent` (`terms_privacy`, version acceptée).
+        - Le mot de passe est stocké haché (`password_hash`), jamais renvoyé.
+      x-status: provisoire
+      x-depends-on: [T1, D7, D13, D14]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterRequest' }
+            example:
+              firstName: Camille
+              lastName: Martin
+              email: camille.martin@example.com
+              phoneNumber: "+33612345678"
+              password: "chien-oslo-2026"
+              acceptedTermsVersion: "2026-10"
       responses:
-        "200":
-          description: OK
+        '201':
+          description: Compte créé, session ouverte.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthSession' }
+        '400':
+          description: |
+            Données invalides (`VALIDATION_FAILED`). Codes par champ : `REQUIRED`, `INVALID_EMAIL`, `INVALID_PHONE`, `PASSWORD_TOO_SHORT`, `TERMS_NOT_ACCEPTED`.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ValidationProblem' }
+              example:
+                status: 400
+                code: VALIDATION_FAILED
+                title: Validation failed
+                errors:
+                  - { field: email, code: INVALID_EMAIL }
+                  - { field: password, code: PASSWORD_TOO_SHORT }
+        '409':
+          description: E-mail déjà utilisé (RG10).
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              example:
+                status: 409
+                code: EMAIL_ALREADY_USED
+                title: Email already used
+
+  /auth/login:
+    post:
+      tags: [Compte]
+      operationId: login
+      summary: Se connecter
+      description: |
+        Écran S19 Connexion (US-27). Ouvre une session et renvoie les jetons.
+
+        Règles appliquées :
+        - Même réponse 401 `INVALID_CREDENTIALS` si l'e-mail est inconnu ou si le mot de passe est faux : l'API ne révèle pas qu'un compte existe (la maquette affiche déjà un message unique, « E-mail ou mot de passe incorrect. »).
+        - E-mail comparé sans tenir compte de la casse (RG10).
+        - Trop d'essais ratés d'affilée → 429 `TOO_MANY_ATTEMPTS` (protection contre le devinage du mot de passe ; seuil fixé côté serveur).
+      x-status: provisoire
+      x-depends-on: [T1]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+            example:
+              email: camille.martin@example.com
+              password: "chien-oslo-2026"
+      responses:
+        '200':
+          description: Session ouverte.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthSession' }
+        '400':
+          description: Champ manquant ou e-mail mal formé (`VALIDATION_FAILED`, codes `REQUIRED`, `INVALID_EMAIL`).
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ValidationProblem' }
+        '401':
+          description: E-mail ou mot de passe incorrect.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              example:
+                status: 401
+                code: INVALID_CREDENTIALS
+                title: Invalid credentials
+        '429':
+          description: Trop d'essais ratés, réessayer plus tard. L'en-tête `Retry-After` donne le délai en secondes.
+          headers:
+            Retry-After:
+              schema: { type: integer }
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              example:
+                status: 429
+                code: TOO_MANY_ATTEMPTS
+                title: Too many attempts
+
+  /auth/refresh:
+    post:
+      tags: [Compte]
+      operationId: refreshSession
+      summary: Renouveler le jeton d'accès
+      description: |
+        Aucun écran : l'app l'appelle seule quand le jeton d'accès expire (convention 6).
+        Échange le jeton de rafraîchissement contre une nouvelle paire de jetons. L'ancien jeton de rafraîchissement devient invalide (rotation à chaque usage).
+
+        Règles appliquées :
+        - Jeton inconnu, expiré ou révoqué → 401 `INVALID_REFRESH_TOKEN` ; l'app renvoie alors vers S19 Connexion.
+        - Un jeton déjà utilisé qui revient est le signe d'un vol : toute la session de cet appareil est révoquée.
+      x-status: provisoire
+      x-depends-on: [T1, D15]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RefreshRequest' }
+      responses:
+        '200':
+          description: Nouvelle paire de jetons.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthTokens' }
+        '401':
+          description: Jeton de rafraîchissement invalide.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              example:
+                status: 401
+                code: INVALID_REFRESH_TOKEN
+                title: Invalid refresh token
+
+  /auth/logout:
+    post:
+      tags: [Compte]
+      operationId: logout
+      summary: Se déconnecter de cet appareil
+      description: |
+        Écran S17 Paramètres → S19 Connexion (US-26). Révoque le jeton de rafraîchissement envoyé : la session de cet appareil est fermée, les autres appareils restent connectés.
+        Idempotent : un jeton déjà révoqué renvoie aussi 204.
+      x-status: provisoire
+      x-depends-on: [T1, D15]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RefreshRequest' }
+      responses:
+        '204':
+          description: Session fermée.
+        '401':
+          description: Jeton d'accès absent ou expiré.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+  /me:
+    get:
+      tags: [Compte]
+      operationId: getMe
+      summary: Lire mon profil
+      description: |
+        Écran S17 Paramètres → Mon profil (US-22). Les initiales sont calculées par l'app à partir du nom.
+      x-status: provisoire
+      x-depends-on: [T1, D7]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Profil de l'utilisateur connecté.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '401':
+          description: Jeton d'accès absent ou expiré.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+    patch:
+      tags: [Compte]
+      operationId: updateMe
+      summary: Modifier mon profil
+      description: |
+        Écran S17 Mon profil, bouton « Enregistrer » (US-22). Seuls les champs envoyés changent (convention 9).
+
+        Règles appliquées :
+        - RG10 : e-mail unique, sans tenir compte de la casse → 409 `EMAIL_ALREADY_USED`.
+        - Changement d'e-mail accepté tout de suite (la maquette n'a pas d'étape de vérification) ; `email_verified_at` repasse à `null`.
+        - `firstName`, `lastName`, `email` ne peuvent pas valoir `null` (400) ; `phoneNumber: null` efface le numéro.
+      x-status: provisoire
+      x-depends-on: [T1, D7]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateMeRequest' }
+            example:
+              email: camille.m@example.com
+              phoneNumber: null
+      responses:
+        '200':
+          description: Profil mis à jour.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '400':
+          description: "Données invalides (`VALIDATION_FAILED`). Codes par champ : `REQUIRED`, `INVALID_EMAIL`, `INVALID_PHONE`."
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ValidationProblem' }
+        '401':
+          description: Jeton d'accès absent ou expiré.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '409':
+          description: E-mail déjà utilisé par un autre compte (RG10).
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              example:
+                status: 409
+                code: EMAIL_ALREADY_USED
+                title: Email already used
+    delete:
+      tags: [Compte]
+      operationId: deleteMe
+      summary: Détruire mon compte
+      description: |
+        Écran S17 → S25 Détruire le compte, bouton de confirmation (US-35 chef, US-36 second). Action définitive. Les conséquences affichées par S25 viennent de `GET /pets` et `GET /pets/{id}/owners`.
+
+        Règles appliquées (hypothèses Q1, à valider par l'équipe et l'avocate) :
+        - Compte : `user_account` supprimé (profil, mot de passe), toutes les sessions révoquées (`refresh_token`), appareils (`device`) et invitations en attente envoyées supprimés.
+        - Chien dont je suis second : seul mon lien *posséder* disparaît (RG16, US-36).
+        - Chien dont je suis chef avec au moins un second actif → 409 `CHIEF_TRANSFER_REQUIRED` : transférer d'abord le rôle de chef (RG73, RG74). Le compte n'est pas supprimé.
+        - Chien dont je suis le seul propriétaire : localisation et identité de l'animal effacées ; métriques santé anonymisées et conservées si `anonymizedDataSharing` est actif, sinon effacées ; collier dissocié et réinitialisé (US-35).
+        - Rendez-vous et dossiers déjà transmis à une clinique : archivés côté Portail (hors sprint).
+      x-status: provisoire
+      x-depends-on: [T1, D15, Q1]
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Compte détruit. L'app efface ses jetons et revient à S19 Connexion.
+        '401':
+          description: Jeton d'accès absent ou expiré.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '409':
+          description: Je suis chef d'au moins un chien qui a un second actif ; transférer le rôle avant de détruire le compte. `detail` cite les chiens concernés.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              example:
+                status: 409
+                code: CHIEF_TRANSFER_REQUIRED
+                title: Chief role transfer required
+                detail: "Nala"
+
+  /me/preferences:
+    get:
+      tags: [Compte]
+      operationId: getMyPreferences
+      summary: Lire mes préférences de confidentialité
+      description: |
+        Écran S17 Paramètres → section Confidentialité (US-24) : les trois interrupteurs.
+      x-status: provisoire
+      x-depends-on: [T1, D6]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Préférences de l'utilisateur connecté.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Preferences' }
+        '401':
+          description: Jeton d'accès absent ou expiré.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+    patch:
+      tags: [Compte]
+      operationId: updateMyPreferences
+      summary: Modifier mes préférences de confidentialité
+      description: |
+        Écran S17 Confidentialité : un appel par interrupteur basculé. Seuls les champs envoyés changent (convention 9).
+
+        Règles appliquées (hypothèses D6) :
+        - `anonymizedDataSharing` est un consentement RGPD : l'activer crée une ligne `consent` (nouveau `consent_type`), le désactiver renseigne `consent_revoked_at`. Historique conservé.
+        - `deviceLocationSharing` et `healthNotifications` sont des préférences du compte, sans historique.
+        - Aucun champ ne peut valoir `null` (400).
+      x-status: provisoire
+      x-depends-on: [T1, D6]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdatePreferencesRequest' }
+            example:
+              anonymizedDataSharing: true
+      responses:
+        '200':
+          description: Préférences mises à jour.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Preferences' }
+        '400':
+          description: "Données invalides (`VALIDATION_FAILED`). Code par champ : `REQUIRED`."
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ValidationProblem' }
+        '401':
+          description: Jeton d'accès absent ou expiré.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+  /pets:
+    get:
+      tags: [Animaux]
+      operationId: listPets
+      summary: Lister mes chiens
+      description: |
+        Écran S05 Mes chiens (liste) ; sert aussi l'en-tête de S01 Santé, l'édition du chien (S05) et S25 Détruire le compte. Le chien actif est choisi et gardé par l'app (local).
+        Chaque chien est complet : pas de `GET /pets/{id}` tant qu'aucun écran n'en a besoin. Liste non paginée (convention 5).
+
+        Règles appliquées :
+        - Seuls les chiens dont je suis propriétaire, chef ou second (lien *posséder*, RG15).
+        - `weightKg` = dernière pesée du carnet (`health_entry`, RG8).
+      x-status: provisoire
+      x-depends-on: [T1, D2, D9]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Mes chiens.
           content:
             application/json:
               schema:
                 type: object
+                required: [items]
                 properties:
-                  status:
-                    type: string
-                    example: ok
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Pet' }
+              example:
+                items:
+                  - id: 3f6c2a1e-8b4d-4c1a-9f2e-1d2c3b4a5e6f
+                    name: Nala
+                    photoUrl: https://cdn.pawrise.example/pets/3f6c2a1e.jpg
+                    photoSample: null
+                    birthDate: "2022-04-12"
+                    sex: female
+                    breeds: [{ code: golden_retriever, name: Golden Retriever }]
+                    weightKg: 27.4
+                    heightCm: 56
+                    medicalNotes: null
+                    myRole: chief
+                    collarSerial: PW-C28A4F
+        '401':
+          description: Jeton d'accès absent ou expiré.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+    post:
+      tags: [Animaux]
+      operationId: createPet
+      summary: Ajouter un chien
+      description: |
+        Écran S09 Ajouter un chien (US-11), étapes nom → photo → naissance → sexe → race → poids → taille → infos santé → récapitulatif. L'app appelle cet endpoint à la fin du récapitulatif, puis enchaîne sur l'association du collier (`PUT /pets/{petId}/collar`) et la photo (`POST /pets/{id}/photo`). Si l'association échoue, le chien existe sans collier (`collarSerial: null`).
+
+        Règles appliquées :
+        - Le créateur devient propriétaire chef (RG73).
+        - Espèce `dog` par défaut (`species_code` obligatoire en BDD, absent de la maquette, D2).
+        - `weightKg` crée une pesée dans le carnet (`health_entry`, RG8).
+        - `heightCm` et `medicalNotes` : nouvelles colonnes `pet.height_cm` et `pet.medical_notes` (D2).
+        - `breedCodes` : liste vide = race inconnue (« Je ne sais pas ») ; le premier code est la race principale. « Croisé » = code `mixed` (D2).
+        - Date de naissance dans le futur → 400 `BIRTH_DATE_IN_FUTURE`.
+      x-status: provisoire
+      x-depends-on: [T1, D2]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreatePetRequest' }
+            example:
+              name: Nala
+              birthDate: "2022-04-12"
+              sex: female
+              breedCodes: [golden_retriever]
+              weightKg: 27.4
+              heightCm: 56
+              medicalNotes: null
+      responses:
+        '201':
+          description: Chien créé (convention 9).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Pet' }
+        '400':
+          description: "Données invalides (`VALIDATION_FAILED`). Codes par champ : `REQUIRED`, `BIRTH_DATE_IN_FUTURE`, `MUST_BE_POSITIVE`, `UNKNOWN_BREED`."
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ValidationProblem' }
+        '401':
+          description: Jeton d'accès absent ou expiré.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+  /pets/{petId}:
+    parameters:
+      - { name: petId, in: path, required: true, schema: { type: string, format: uuid } }
+    patch:
+      tags: [Animaux]
+      operationId: updatePet
+      summary: Modifier le profil du chien
+      description: |
+        Écran S05 Mes chiens → fiche d'édition du chien (US-14), bouton « Enregistrer ». Seuls les champs envoyés changent (convention 9). La photo se change à part (`POST /pets/{petId}/photo`).
+
+        Règles appliquées :
+        - Tout propriétaire du chien, chef ou second, peut le modifier (hypothèse Q2).
+        - `breedCodes` remplace toute la liste ; codes de `GET /breeds` uniquement (la fiche d'édition de la maquette saisit la race en texte libre : M5).
+        - `weightKg` ajoute une pesée datée de maintenant dans le carnet (`health_entry`, RG8) ; l'historique n'est pas réécrit. `null` refusé (400).
+        - `name` et `sex` ne peuvent pas valoir `null` ; `birthDate`, `heightCm`, `medicalNotes` à `null` sont effacés.
+        - Chien inexistant ou d'un autre compte → 404 `PET_NOT_FOUND`.
+      x-status: provisoire
+      x-depends-on: [T1, D2, Q2]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdatePetRequest' }
+            example:
+              weightKg: 28.1
+              medicalNotes: "Allergie au poulet."
+      responses:
+        '200':
+          description: Chien mis à jour.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Pet' }
+        '400':
+          description: "Données invalides (`VALIDATION_FAILED`). Codes par champ : `REQUIRED`, `BIRTH_DATE_IN_FUTURE`, `MUST_BE_POSITIVE`, `UNKNOWN_BREED`."
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ValidationProblem' }
+        '401':
+          description: Jeton d'accès absent ou expiré.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '404':
+          description: Chien inexistant ou d'un autre compte.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              example: { status: 404, code: PET_NOT_FOUND, title: Pet not found }
+
+  /pets/{petId}/photo:
+    parameters:
+      - { name: petId, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Animaux]
+      operationId: setPetPhoto
+      summary: Changer la photo du chien
+      description: |
+        Écran S09 Ajouter un chien, étape photo, et S05 Édition du chien. Deux formes, selon le `Content-Type` :
+        - `multipart/form-data` : ma propre photo (champ `file`, JPEG ou PNG, 1,5 Mo maximum). Stockée par Pawrise, renvoyée dans `photoUrl`.
+        - `application/json` : une photo d'exemple, par sa clé (`sample`). Les images d'exemple sont embarquées dans l'app ; l'API ne stocke que la clé, renvoyée dans `photoSample`.
+
+        Règles appliquées :
+        - La nouvelle photo remplace l'ancienne (l'ancien fichier est supprimé).
+        - Tout propriétaire du chien, chef ou second, peut la changer (hypothèse Q2).
+        - Chien inexistant ou d'un autre compte → 404 `PET_NOT_FOUND` (convention 4).
+      x-status: provisoire
+      x-depends-on: [T1, Q2]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary, description: "JPEG ou PNG, 1,5 Mo maximum." }
+          application/json:
+            schema: { $ref: '#/components/schemas/SamplePhotoRequest' }
+            example: { sample: sample_2 }
+      responses:
+        '200':
+          description: Photo changée.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Pet' }
+        '400':
+          description: "Fichier ou clé invalide (`VALIDATION_FAILED`). Codes par champ : `REQUIRED`, `UNSUPPORTED_FORMAT`, `UNKNOWN_SAMPLE`."
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ValidationProblem' }
+        '401':
+          description: Jeton d'accès absent ou expiré.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '404':
+          description: Chien inexistant ou d'un autre compte.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              example: { status: 404, code: PET_NOT_FOUND, title: Pet not found }
+        '413':
+          description: Fichier de plus de 1,5 Mo.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              example: { status: 413, code: FILE_TOO_LARGE, title: File too large }
+
+  /breeds:
+    get:
+      tags: [Animaux]
+      operationId: listBreeds
+      summary: Lister les races
+      description: |
+        Écran S09 Ajouter un chien, étape race (recherche), et fiche d'édition du chien (M5). Liste filtrée par `q` et bornée par `limit`, sans curseur (convention 5).
+
+        Règles appliquées :
+        - Races du chien uniquement (`species_code = dog`, D2).
+        - « Croisé » est une race comme les autres (code `mixed`, D2), renvoyée en premier quand `q` est vide.
+        - « Je ne sais pas » n'est pas renvoyé : l'app l'affiche elle-même et envoie une liste de races vide.
+        - `q` : recherche sur le nom, sans tenir compte de la casse ni des accents.
+      x-status: provisoire
+      x-depends-on: [T1, D2]
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: q, in: query, required: false, schema: { type: string, maxLength: 100 } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+      responses:
+        '200':
+          description: Races correspondantes, triées par nom (`mixed` en tête si `q` est vide).
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Breed' }
+              example:
+                items:
+                  - { code: mixed, name: Croisé }
+                  - { code: akita_inu, name: Akita Inu }
+                  - { code: beagle, name: Beagle }
+        '401':
+          description: Jeton d'accès absent ou expiré.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+  /pets/{petId}/collar:
+    parameters:
+      - { name: petId, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Colliers]
+      operationId: getPetCollar
+      summary: Voir le collier du chien
+      description: |
+        Feuille « Collier » ouverte depuis la pastille batterie de S01 Santé (US-13) : batterie, réseau, code, modèle.
+
+        Règles appliquées :
+        - `serialNumber`, `model` : App-DB (`collar`). `batteryPct`, `lastSeenAt`, `connected` : dernière mesure reçue, lue par API-CORE dans TimescaleDB en lecture seule (RG24, D10).
+        - `connected` est calculé par l'API (dernière mesure récente ; seuil fixé côté serveur, 3 min dans la maquette).
+        - Chien sans collier → 404 `COLLAR_NOT_ASSIGNED` ; chien inexistant ou d'un autre compte → 404 `PET_NOT_FOUND`.
+      x-status: provisoire
+      x-depends-on: [T1, D10]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Collier actuel du chien.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Collar' }
+              example:
+                serialNumber: PW-C28A4F
+                model: C2
+                batteryPct: 72
+                connected: true
+                lastSeenAt: "2026-10-30T09:12:04Z"
+                assignedAt: "2026-09-02T18:40:00Z"
+        '401':
+          description: Jeton d'accès absent ou expiré.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '404':
+          description: Chien introuvable (`PET_NOT_FOUND`) ou sans collier (`COLLAR_NOT_ASSIGNED`).
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+    put:
+      tags: [Colliers]
+      operationId: setPetCollar
+      summary: Associer ou remplacer le collier du chien
+      description: |
+        Deux écrans, un seul endpoint (le collier du chien est remplacé par celui du code) :
+        - S10 Associer un collier, après l'ajout du chien (US-12) : code `PW-XXXXXX` scanné (QR) ou saisi.
+        - Feuille « Collier » → « Remplacer le collier » (US-13) : nouveau code ; l'ancien collier est dissocié.
+
+        Règles appliquées (D9 validé : les colliers sont enregistrés par Pawrise avant la vente) :
+        - Code normalisé (majuscules, sans espaces) puis cherché dans `collar.serial_number` ; inconnu ou retiré (`retired`) → 400 `UNKNOWN_COLLAR`.
+        - Collier déjà affecté à un autre chien → 409 `COLLAR_ALREADY_ASSIGNED` (RG21).
+        - Collier libre : passé `active` (`activated_at` à la première activation), puis nouvelle affectation `collar_assignment` (RG20, RG23).
+        - Remplacement : l'affectation de l'ancien collier est clôturée (`unassigned_at`, RG22), l'ancien collier repasse `inactive` ; une notification « Nouveau collier associé » est créée pour les propriétaires (C8, D4).
+        - Même code que le collier actuel : rien ne change, 200.
+        - Tout propriétaire du chien, chef ou second (hypothèse Q2).
+      x-status: provisoire
+      x-depends-on: [T1, D4, Q2]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SetCollarRequest' }
+            example: { serialNumber: PW-C28A4F }
+      responses:
+        '200':
+          description: Collier associé.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Collar' }
+        '400':
+          description: "Code invalide (`VALIDATION_FAILED`). Codes par champ : `REQUIRED`, `INVALID_COLLAR_CODE` (format), `UNKNOWN_COLLAR` (absent du stock ou retiré)."
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ValidationProblem' }
+        '401':
+          description: Jeton d'accès absent ou expiré.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '404':
+          description: Chien inexistant ou d'un autre compte.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              example: { status: 404, code: PET_NOT_FOUND, title: Pet not found }
+        '409':
+          description: Collier déjà associé à un autre chien (RG21).
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              example: { status: 409, code: COLLAR_ALREADY_ASSIGNED, title: Collar already assigned }
+
+  /pets/{petId}/health:
+    parameters:
+      - { name: petId, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Santé]
+      operationId: getPetHealth
+      summary: Tableau de bord santé du chien
+      description: |
+        Écran S01 Santé (US-01) : score bien-être, état, message de synthèse, 5 indicateurs (valeur et état), batterie et collier connecté. Le détail d'un indicateur (message, série, plage normale) est dans `GET /pets/{petId}/health/{indicator}`.
+
+        Règles appliquées (D10) :
+        - Valeurs, batterie, connexion : lues par API-CORE dans TimescaleDB (lecture seule), sur les dernières 24 h.
+        - `score`, `state`, `summary`, états des indicateurs : calculés par l'IA-ENGINE (I5). `summary` est un texte généré, donc en français, seule langue du MVP (convention 6 : pas d'en-tête de langue).
+        - IA-ENGINE indisponible : 200 avec `score`, `state`, `summary` à `null` et les valeurs brutes quand même ; l'app affiche les valeurs sans score.
+        - Pas encore de mesure (collier jamais connecté) ou chien sans collier : indicateurs à `null`, `collar` à `null` si aucun collier.
+        - Rythme cardiaque et fibrillation : capteur non identifié (D10) ; `null` tant qu'ils ne sont pas mesurés.
+        - Chien inexistant ou d'un autre compte → 404 `PET_NOT_FOUND`.
+      x-status: provisoire
+      x-depends-on: [T1, D10]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: État de santé actuel.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HealthDashboard' }
+              example:
+                score: 87
+                state: good
+                summary: "Nala va bien : activité, sommeil et température dans ses habitudes."
+                indicators:
+                  heartRate: { state: good, heartRateBpm: 78 }
+                  atrialFibrillation: { state: good, irregularBeatDetected: false }
+                  activity: { state: good, activityMin: 94 }
+                  sleep: { state: good, sleepMin: 450 }
+                  temperature: { state: good, temperatureC: 38.6 }
+                collar: { batteryPct: 72, connected: true, lastSeenAt: "2026-10-30T09:12:04Z" }
+        '401':
+          description: Jeton d'accès absent ou expiré.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '404':
+          description: Chien inexistant ou d'un autre compte.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              example: { status: 404, code: PET_NOT_FOUND, title: Pet not found }
+
+  /pets/{petId}/health/{indicator}:
+    parameters:
+      - { name: petId, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: indicator, in: path, required: true, schema: { $ref: '#/components/schemas/IndicatorCode' } }
+    get:
+      tags: [Santé]
+      operationId: getPetIndicator
+      summary: Détail d'un indicateur santé
+      description: |
+        Écran S02 Détail indicateur (US-02), ouvert depuis une tuile de S01 : état, valeur actuelle, message simple, détail, courbe sur la période choisie, plage normale. Série non paginée, bornée par `period` (convention 5).
+
+        Règles appliquées (D10) :
+        - Série lue par API-CORE dans TimescaleDB (lecture seule) : `today` = 24 points horaires, `7d` = 7 points journaliers, `30d` = 30 points journaliers. Point sans mesure : `value` à `null` (trou dans la courbe).
+        - `state`, `message`, `detail`, `normalRange` : IA-ENGINE (I5) ; à `null` s'il est indisponible. Textes en français (convention 6).
+        - Unité fixe par indicateur (champ `unit`) : `heart_rate` bpm (moyenne), `atrial_fibrillation` nombre d'épisodes irréguliers, `activity` minutes actives, `sleep` minutes de sommeil, `temperature` °C (moyenne).
+        - Fibrillation : la maquette n'affiche que `today` (pas de choix de période) ; l'API accepte quand même les trois.
+        - Chien inexistant ou d'un autre compte → 404 `PET_NOT_FOUND`.
+      x-status: provisoire
+      x-depends-on: [T1, D10]
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: period, in: query, required: false, schema: { type: string, enum: [today, 7d, 30d], default: today } }
+      responses:
+        '200':
+          description: Détail de l'indicateur sur la période.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IndicatorDetail' }
+              example:
+                indicator: heart_rate
+                period: today
+                unit: bpm
+                state: watch
+                current: 112
+                message: "Le rythme cardiaque de Nala est inhabituellement élevé depuis 45 minutes."
+                detail: "Au repos, il reste au-dessus de 100 bpm. Si cela dure, parlez-en à un vétérinaire."
+                normalRange: { min: 60, max: 100 }
+                points:
+                  - { at: "2026-10-30T08:00:00Z", value: 84 }
+                  - { at: "2026-10-30T09:00:00Z", value: 112 }
+        '400':
+          description: "Période inconnue (`VALIDATION_FAILED`, code `INVALID_PERIOD`)."
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ValidationProblem' }
+        '401':
+          description: Jeton d'accès absent ou expiré.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '404':
+          description: Chien inexistant ou d'un autre compte.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              example: { status: 404, code: PET_NOT_FOUND, title: Pet not found }
+
+  /pets/{petId}/reminders:
+    parameters:
+      - { name: petId, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Santé]
+      operationId: listReminders
+      summary: Lister les rappels du chien
+      description: |
+        Écran S12 Rappels (US-15). Liste non paginée (convention 5), triée par échéance croissante.
+
+        Règles appliquées (D3 tranché : table `reminder`) :
+        - Tout propriétaire du chien, chef ou second (hypothèse Q2).
+        - `status` calculé par l'API : `done` si `doneAt` renseigné, sinon `overdue` si l'échéance est passée, sinon `upcoming`.
+        - Chien inexistant ou d'un autre compte → 404 `PET_NOT_FOUND`.
+      x-status: provisoire
+      x-depends-on: [T1, D3, Q2]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Rappels du chien.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Reminder' }
+        '401':
+          description: Jeton d'accès absent ou expiré.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '404':
+          description: Chien inexistant ou d'un autre compte.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              example: { status: 404, code: PET_NOT_FOUND, title: Pet not found }
+    post:
+      tags: [Santé]
+      operationId: createReminder
+      summary: Créer un rappel
+      description: |
+        Écran S12 Rappels → « Ajouter un rappel » (US-15) : type de soin, nom, échéance.
+
+        Règles appliquées (D3 tranché : table `reminder`) :
+        - Tout propriétaire du chien, chef ou second (hypothèse Q2).
+        - `status` calculé par l'API : `done` si `doneAt` renseigné, sinon `overdue` si l'échéance est passée, sinon `upcoming`.
+        - Une échéance passée est acceptée (le rappel est alors `overdue`).
+        - Les notifications d'échéance proche (US-16) sont traitées en C8.
+      x-status: provisoire
+      x-depends-on: [T1, D3, Q2]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateReminderRequest' }
+            example: { kind: vaccine, title: Rappel rage, dueAt: "2026-11-15T09:00:00Z" }
+      responses:
+        '201':
+          description: Rappel créé.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Reminder' }
+        '400':
+          description: "Données invalides (`VALIDATION_FAILED`). Codes par champ : `REQUIRED`, `INVALID_DATE`."
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ValidationProblem' }
+        '401':
+          description: Jeton d'accès absent ou expiré.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '404':
+          description: Chien inexistant ou d'un autre compte.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              example: { status: 404, code: PET_NOT_FOUND, title: Pet not found }
+
+  /reminders/{reminderId}:
+    parameters:
+      - { name: reminderId, in: path, required: true, schema: { type: string, format: uuid } }
+    patch:
+      tags: [Santé]
+      operationId: updateReminder
+      summary: Modifier, marquer effectué ou rouvrir un rappel
+      description: |
+        Écran S12 Rappels : « Modifier », « Marquer effectué », « Rouvrir » (US-15). Seuls les champs envoyés changent (convention 9).
+
+        Règles appliquées (D3 tranché : table `reminder`) :
+        - Tout propriétaire du chien, chef ou second (hypothèse Q2).
+        - `status` calculé par l'API : `done` si `doneAt` renseigné, sinon `overdue` si l'échéance est passée, sinon `upcoming`.
+        - `done: true` renseigne `doneAt` (maintenant) ; `done: false` le remet à `null` (« Rouvrir »).
+        - Marquer effectué ne crée pas d'entrée dans le carnet : aucun écran de carnet dans la maquette.
+        - Rappel inexistant ou d'un chien d'un autre compte → 404 `REMINDER_NOT_FOUND`.
+      x-status: provisoire
+      x-depends-on: [T1, D3, Q2]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateReminderRequest' }
+            example: { done: true }
+      responses:
+        '200':
+          description: Rappel mis à jour.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Reminder' }
+        '400':
+          description: "Données invalides (`VALIDATION_FAILED`). Codes par champ : `REQUIRED`, `INVALID_DATE`."
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ValidationProblem' }
+        '401':
+          description: Jeton d'accès absent ou expiré.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '404':
+          description: Rappel introuvable.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              example: { status: 404, code: REMINDER_NOT_FOUND, title: Reminder not found }
+    delete:
+      tags: [Santé]
+      operationId: deleteReminder
+      summary: Supprimer un rappel
+      description: |
+        Écran S12 Rappels → « Supprimer » (US-15). Les notifications liées à ce rappel sont supprimées aussi.
+      x-status: provisoire
+      x-depends-on: [T1, D3, Q2]
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Rappel supprimé.
+        '401':
+          description: Jeton d'accès absent ou expiré.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '404':
+          description: Rappel introuvable.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              example: { status: 404, code: REMINDER_NOT_FOUND, title: Reminder not found }
+
+  /pets/{petId}/location:
+    parameters:
+      - { name: petId, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Localisation]
+      operationId: getPetLocation
+      summary: Dernière position du chien
+      description: |
+        Écran S06 Localisation (US-05) : position sur la carte, heure de la dernière position (« il y a 30 s »), collier connecté, batterie, code du collier. Le bouton « actualiser » rappelle cet endpoint.
+
+        Règles appliquées (D10) :
+        - Lu par API-CORE dans TimescaleDB (lecture seule) : dernière position reçue du collier actuel.
+        - `stale` calculé par l'API : dernière position de plus de 3 min (seuil de la maquette). L'app compte elle-même les secondes depuis `recordedAt`.
+        - « Actualiser » relit la dernière position reçue ; il ne demande pas de position au collier (pas de commande descendante au MVP).
+        - Collier jamais connecté : 200 avec `latitude`, `longitude`, `recordedAt` à `null`.
+        - Chien sans collier → 404 `COLLAR_NOT_ASSIGNED` ; chien inexistant ou d'un autre compte → 404 `PET_NOT_FOUND`.
+      x-status: provisoire
+      x-depends-on: [T1, D10]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Dernière position connue.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PetLocation' }
+              example:
+                latitude: 48.856613
+                longitude: 2.352222
+                recordedAt: "2026-10-30T09:12:04Z"
+                stale: false
+                connected: true
+                batteryPct: 72
+                collarSerial: PW-C28A4F
+        '401':
+          description: Jeton d'accès absent ou expiré.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '404':
+          description: Chien introuvable (`PET_NOT_FOUND`) ou sans collier (`COLLAR_NOT_ASSIGNED`).
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+  /pets/{petId}/trail:
+    parameters:
+      - { name: petId, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Localisation]
+      operationId: getPetTrail
+      summary: Trajet récent du chien
+      description: |
+        Écran S06 Localisation, trace « Afficher / Masquer le trajet » (US-06) : derniers points GPS, du plus ancien au plus récent. Liste bornée par `limit`, sans curseur (convention 5).
+
+        Règles appliquées (D10) :
+        - Lu par API-CORE dans TimescaleDB (lecture seule), pour le collier actuel du chien.
+        - 20 points par défaut (maquette), 100 au maximum ; seulement les points des dernières 24 h.
+        - Chien sans collier → 404 `COLLAR_NOT_ASSIGNED` ; chien inexistant ou d'un autre compte → 404 `PET_NOT_FOUND`.
+      x-status: provisoire
+      x-depends-on: [T1, D10]
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+      responses:
+        '200':
+          description: Points du trajet (liste vide si aucun point sur 24 h).
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/GeoPoint' }
+              example:
+                items:
+                  - { latitude: 48.856100, longitude: 2.351800, recordedAt: "2026-10-30T09:02:04Z" }
+                  - { latitude: 48.856613, longitude: 2.352222, recordedAt: "2026-10-30T09:12:04Z" }
+        '401':
+          description: Jeton d'accès absent ou expiré.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '404':
+          description: Chien introuvable (`PET_NOT_FOUND`) ou sans collier (`COLLAR_NOT_ASSIGNED`).
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+  /pets/{petId}/zones:
+    parameters:
+      - { name: petId, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Localisation]
+      operationId: listZones
+      summary: Lister les zones de sécurité du chien
+      description: |
+        Feuille S07 Zones de sécurité, ouverte depuis S06 (US-07) : emoji, nom, rayon, alertes actives, chien dedans ou dehors. Liste non paginée (convention 5).
+
+        Règles appliquées (D5 tranché : la zone appartient au chien) :
+        - Zone = cercle, centre + rayon (RG31) ; zone sécurisée uniquement, alerte en sortie (RG32 ; zone interdite absente de la maquette, non exposée).
+        - Tous les propriétaires du chien, chef ou second, voient et gèrent ses zones ; une alerte de sortie va à tous les propriétaires (RG35, C8).
+        - `petInside` calculé par l'API à partir de la dernière position (TimescaleDB, D10) ; `null` sans position.
+        - « Afficher / masquer » une zone sur la carte reste local à l'app.
+      x-status: provisoire
+      x-depends-on: [T1, D5, D10]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Zones du chien.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Zone' }
+              example:
+                items:
+                  - { id: 9b1e4c2a-1f0d-4e8b-a1c3-5d6e7f8a9b0c, petId: 3f6c2a1e-8b4d-4c1a-9f2e-1d2c3b4a5e6f, name: Maison, emoji: "🏡", latitude: 48.856613, longitude: 2.352222, radiusM: 80, alertsEnabled: true, petInside: true }
+        '401':
+          description: Jeton d'accès absent ou expiré.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '404':
+          description: Chien inexistant ou d'un autre compte.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              example: { status: 404, code: PET_NOT_FOUND, title: Pet not found }
+    post:
+      tags: [Localisation]
+      operationId: createZone
+      summary: Ajouter une zone de sécurité
+      description: |
+        Feuille S07 → « Ajouter une zone » (US-07). L'app envoie le centre choisi sur la carte.
+
+        Règles appliquées (D5 tranché : la zone appartient au chien) :
+        - Zone = cercle, centre + rayon (RG31) ; zone sécurisée uniquement, alerte en sortie (RG32 ; zone interdite absente de la maquette, non exposée).
+        - Tous les propriétaires du chien, chef ou second, voient et gèrent ses zones ; une alerte de sortie va à tous les propriétaires (RG35, C8).
+        - Valeurs par défaut de la maquette : `emoji` 📍, `alertsEnabled` vrai.
+      x-status: provisoire
+      x-depends-on: [T1, D5]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateZoneRequest' }
+            example: { name: Parc, latitude: 48.858000, longitude: 2.350000, radiusM: 120 }
+      responses:
+        '201':
+          description: Zone créée.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Zone' }
+        '400':
+          description: "Données invalides (`VALIDATION_FAILED`). Codes par champ : `REQUIRED`, `OUT_OF_RANGE`."
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ValidationProblem' }
+        '401':
+          description: Jeton d'accès absent ou expiré.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '404':
+          description: Chien inexistant ou d'un autre compte.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              example: { status: 404, code: PET_NOT_FOUND, title: Pet not found }
+
+  /zones/{zoneId}:
+    parameters:
+      - { name: zoneId, in: path, required: true, schema: { type: string, format: uuid } }
+    patch:
+      tags: [Localisation]
+      operationId: updateZone
+      summary: Renommer, redimensionner, déplacer une zone ou régler ses alertes
+      description: |
+        Feuille S07 : nom, emoji, rayon, interrupteur « Alertes de sortie » (US-07). Seuls les champs envoyés changent (convention 9).
+
+        Règles appliquées (D5 tranché : la zone appartient au chien) :
+        - Zone = cercle, centre + rayon (RG31) ; zone sécurisée uniquement, alerte en sortie (RG32 ; zone interdite absente de la maquette, non exposée).
+        - Tous les propriétaires du chien, chef ou second, voient et gèrent ses zones ; une alerte de sortie va à tous les propriétaires (RG35, C8).
+        - Zone inexistante ou d'un chien d'un autre compte → 404 `ZONE_NOT_FOUND`.
+      x-status: provisoire
+      x-depends-on: [T1, D5]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateZoneRequest' }
+            example: { radiusM: 150, alertsEnabled: false }
+      responses:
+        '200':
+          description: Zone mise à jour.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Zone' }
+        '400':
+          description: "Données invalides (`VALIDATION_FAILED`). Codes par champ : `REQUIRED`, `OUT_OF_RANGE`."
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ValidationProblem' }
+        '401':
+          description: Jeton d'accès absent ou expiré.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '404':
+          description: Zone introuvable.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              example: { status: 404, code: ZONE_NOT_FOUND, title: Zone not found }
+    delete:
+      tags: [Localisation]
+      operationId: deleteZone
+      summary: Supprimer une zone
+      description: |
+        Feuille S07 → corbeille (US-07). Supprime la zone pour tous les propriétaires du chien.
+      x-status: provisoire
+      x-depends-on: [T1, D5]
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Zone supprimée.
+        '401':
+          description: Jeton d'accès absent ou expiré.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '404':
+          description: Zone introuvable.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              example: { status: 404, code: ZONE_NOT_FOUND, title: Zone not found }
+
+  /notifications:
+    get:
+      tags: [Notifications]
+      operationId: listNotifications
+      summary: Lister mes notifications
+      description: |
+        Feuille S13 Notifications (US-17), ouverte depuis la cloche ; sert aussi la bannière « a quitté la zone » de S06. Tous mes chiens confondus, du plus récent au plus ancien, paginée par curseur (convention 5).
+
+        Règles appliquées (D4 tranché : table `notification`, une ligne par destinataire) :
+        - « Lu » propre à chaque personne (`read_at`) ; lire une notification ne la marque pas lue pour les autres propriétaires.
+        - `alert` reste l'événement (cause obligatoire RG51, acquittement RG52) ; chaque alerte crée une notification par propriétaire du chien (RG35, RG50).
+        - Types créés : alerte santé, batterie, déconnexion (`health`) ; sortie de zone (`map`) ; échéance de rappel à moins de 24 h et nouveau collier (`reminder`, `health`, US-16) ; message véto (`vet`, hors sprint).
+        - `unreadCount` : total de mes non lues, pour le badge de la cloche.
+        - Préférence `healthNotifications` désactivée (`/me/preferences`) : pas d'envoi push pour les alertes santé ; la notification reste dans la liste.
+        - Toucher une notification : l'app ouvre l'écran selon `kind` (et `reminderId`, `alertId`), puis la marque lue.
+      x-status: provisoire
+      x-depends-on: [T1, D4]
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: unread, in: query, required: false, schema: { type: boolean, default: false }, description: "« Afficher les non lues »." }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+        - { name: cursor, in: query, required: false, schema: { type: string } }
+      responses:
+        '200':
+          description: Page de notifications.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, nextCursor, unreadCount]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Notification' }
+                  nextCursor: { type: [string, 'null'] }
+                  unreadCount: { type: integer, minimum: 0 }
+              example:
+                items:
+                  - { id: 5c1d2e3f-4a5b-6c7d-8e9f-0a1b2c3d4e5f, petId: 3f6c2a1e-8b4d-4c1a-9f2e-1d2c3b4a5e6f, kind: map, title: "Nala a quitté la zone Maison", createdAt: "2026-10-30T09:14:00Z", read: false, alertId: 7a8b9c0d-1e2f-3a4b-5c6d-7e8f9a0b1c2d, reminderId: null }
+                nextCursor: null
+                unreadCount: 1
+        '401':
+          description: Jeton d'accès absent ou expiré.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+  /notifications/{notificationId}:
+    parameters:
+      - { name: notificationId, in: path, required: true, schema: { type: string, format: uuid } }
+    patch:
+      tags: [Notifications]
+      operationId: updateNotification
+      summary: Marquer une notification lue ou non lue
+      description: |
+        Feuille S13 : toucher une notification la marque lue (US-17).
+
+        Règles appliquées (D4 tranché : table `notification`, une ligne par destinataire) :
+        - « Lu » propre à chaque personne (`read_at`) ; lire une notification ne la marque pas lue pour les autres propriétaires.
+        - `alert` reste l'événement (cause obligatoire RG51, acquittement RG52) ; chaque alerte crée une notification par propriétaire du chien (RG35, RG50).
+        - Notification d'un autre destinataire → 404 `NOTIFICATION_NOT_FOUND`.
+      x-status: provisoire
+      x-depends-on: [T1, D4]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [read]
+              properties:
+                read: { type: boolean }
+            example: { read: true }
+      responses:
+        '200':
+          description: Notification mise à jour.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Notification' }
+        '401':
+          description: Jeton d'accès absent ou expiré.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '404':
+          description: Notification introuvable.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              example: { status: 404, code: NOTIFICATION_NOT_FOUND, title: Notification not found }
+
+  /notifications/read-all:
+    post:
+      tags: [Notifications]
+      operationId: readAllNotifications
+      summary: Tout marquer comme lu
+      description: |
+        Feuille S13 → « Tout marquer comme lu » (US-17). Mes notifications seulement ; idempotent.
+      x-status: provisoire
+      x-depends-on: [T1, D4]
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Toutes mes notifications sont lues.
+        '401':
+          description: Jeton d'accès absent ou expiré.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+  /pets/{petId}/conversation/messages:
+    parameters:
+      - { name: petId, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Chat]
+      operationId: listMessages
+      summary: Lire mon fil de chat pour ce chien
+      description: |
+        Écran S04 Chat (US-08) : messages et suggestions de réponse. Paginé par curseur, du plus récent au plus ancien ; l'app charge les plus anciens en remontant le fil (convention 5).
+
+        Règles appliquées (D12 tranché : un fil par chien et par propriétaire) :
+        - Mon fil pour ce chien : la conversation la plus récente dont je suis l'initiateur (RG53). Les autres propriétaires ont leur propre fil, invisible pour moi.
+        - Créé automatiquement au premier message ou au premier contexte d'alerte.
+        - Pas d'escalade vers un vétérinaire au sprint 1 (D11) ; `role: vet` réservé.
+        - Aucun fil encore : liste vide.
+      x-status: provisoire
+      x-depends-on: [T1, D11, D12]
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+        - { name: cursor, in: query, required: false, schema: { type: string } }
+      responses:
+        '200':
+          description: Page de messages.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, nextCursor]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/ChatMessage' }
+                  nextCursor: { type: [string, 'null'] }
+        '401':
+          description: Jeton d'accès absent ou expiré.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '404':
+          description: Chien inexistant ou d'un autre compte.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              example: { status: 404, code: PET_NOT_FOUND, title: Pet not found }
+    post:
+      tags: [Chat]
+      operationId: sendMessage
+      summary: Envoyer un message à Pawrise
+      description: |
+        Écran S04 Chat : message libre, ou suggestion de réponse touchée (US-08). Réponse synchrone : le message envoyé et la réponse de l'IA.
+
+        Règles appliquées (D12 tranché : un fil par chien et par propriétaire) :
+        - Mon fil pour ce chien : la conversation la plus récente dont je suis l'initiateur (RG53). Les autres propriétaires ont leur propre fil, invisible pour moi.
+        - Créé automatiquement au premier message ou au premier contexte d'alerte.
+        - Pas d'escalade vers un vétérinaire au sprint 1 (D11) ; `role: vet` réservé.
+        - Réponse de l'IA : IA-ENGINE (I5, LLM + RAG). Conseil, pas un diagnostic (le MVP n'est pas un dispositif médical).
+        - IA-ENGINE indisponible → 503 `AI_UNAVAILABLE` ; le message envoyé reste enregistré.
+      x-status: provisoire
+      x-depends-on: [T1, D11, D12]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [content]
+              properties:
+                content: { type: string, minLength: 1, maxLength: 2000, description: Texte saisi ou suggestion choisie. }
+            example: { content: "Est-ce grave s'il boit beaucoup ?" }
+      responses:
+        '201':
+          description: Message enregistré et réponse de l'IA.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [sent, reply]
+                properties:
+                  sent: { $ref: '#/components/schemas/ChatMessage' }
+                  reply: { $ref: '#/components/schemas/ChatMessage' }
+        '400':
+          description: "Message vide ou trop long (`VALIDATION_FAILED`, codes `REQUIRED`, `TOO_LONG`)."
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ValidationProblem' }
+        '401':
+          description: Jeton d'accès absent ou expiré.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '404':
+          description: Chien inexistant ou d'un autre compte.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              example: { status: 404, code: PET_NOT_FOUND, title: Pet not found }
+        '503':
+          description: IA-ENGINE indisponible. Le message de l'utilisateur est enregistré ; l'app propose de réessayer.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              example: { status: 503, code: AI_UNAVAILABLE, title: AI unavailable }
+
+  /pets/{petId}/conversation/context:
+    parameters:
+      - { name: petId, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Chat]
+      operationId: addChatContext
+      summary: Ouvrir le chat sur une alerte
+      description: |
+        S02 « Demander à Pawrise » (indicateur en alerte, US-03) et bannière « a quitté la zone » de S06 (US-09) : ajoute dans mon fil un message de Pawrise qui pose le contexte (chien + alerte), avec des suggestions de réponse ; l'app bascule ensuite sur S04.
+
+        Règles appliquées (D12 tranché : un fil par chien et par propriétaire) :
+        - Mon fil pour ce chien : la conversation la plus récente dont je suis l'initiateur (RG53). Les autres propriétaires ont leur propre fil, invisible pour moi.
+        - Créé automatiquement au premier message ou au premier contexte d'alerte.
+        - Pas d'escalade vers un vétérinaire au sprint 1 (D11) ; `role: vet` réservé.
+        - Un seul des deux champs : `alertId` (alerte de santé ou de zone) ou `indicator` (indicateur à surveiller sans alerte).
+        - Alerte d'un autre chien ou inconnue → 404 `ALERT_NOT_FOUND`.
+      x-status: provisoire
+      x-depends-on: [T1, D11, D12]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              minProperties: 1
+              maxProperties: 1
+              properties:
+                alertId: { type: string, format: uuid }
+                indicator: { $ref: '#/components/schemas/IndicatorCode' }
+            example: { alertId: 7a8b9c0d-1e2f-3a4b-5c6d-7e8f9a0b1c2d }
+      responses:
+        '201':
+          description: Message de contexte ajouté.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChatMessage' }
+              example:
+                id: 1d2e3f4a-5b6c-7d8e-9f0a-1b2c3d4e5f6a
+                role: ai
+                content: "Nala a quitté la zone Maison il y a 2 minutes. Voulez-vous que je vous aide ?"
+                sentAt: "2026-10-30T09:16:00Z"
+                quickReplies: ["Où est-elle ?", "Que dois-je faire ?"]
+        '400':
+          description: "Aucun ou deux champs (`VALIDATION_FAILED`, code `REQUIRED`)."
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ValidationProblem' }
+        '401':
+          description: Jeton d'accès absent ou expiré.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '404':
+          description: Chien inexistant ou d'un autre compte.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              example: { status: 404, code: PET_NOT_FOUND, title: Pet not found }
+        '503':
+          description: IA-ENGINE indisponible. Le message de l'utilisateur est enregistré ; l'app propose de réessayer.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              example: { status: 503, code: AI_UNAVAILABLE, title: AI unavailable }
+
+  /pets/{petId}/owners:
+    parameters:
+      - { name: petId, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Partage]
+      operationId: listOwners
+      summary: Lister les propriétaires du chien
+      description: |
+        Écran S18 Propriétaires et partage (US-31) et S25 Détruire le compte : nom, e-mail, rôle (chef, second, invitation en attente), « vous ». Liste non paginée (convention 5) : chef d'abord, puis seconds, puis invitations en attente.
+
+        Règles appliquées :
+        - Visible par tout propriétaire du chien (RG15).
+        - Une invitation en attente apparaît avec `role: pending`, `userId` et `name` à `null`.
+      x-status: provisoire
+      x-depends-on: [T1, Q3]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Propriétaires et invitations en attente.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/PetOwner' }
+              example:
+                items:
+                  - { userId: 2a3b4c5d-6e7f-8a9b-0c1d-2e3f4a5b6c7d, name: Camille Martin, email: camille.martin@example.com, role: chief, isMe: true, invitationId: null }
+                  - { userId: null, name: null, email: lea.moreau@example.com, role: pending, isMe: false, invitationId: 8c9d0e1f-2a3b-4c5d-6e7f-8a9b0c1d2e3f }
+        '401':
+          description: Jeton d'accès absent ou expiré.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '404':
+          description: Chien inexistant ou d'un autre compte.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              example: { status: 404, code: PET_NOT_FOUND, title: Pet not found }
+
+  /pets/{petId}/owners/{userId}/chief:
+    parameters:
+      - { name: petId, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: userId, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Partage]
+      operationId: transferChief
+      summary: Donner le rôle de chef
+      description: |
+        S18 → S22 Rôle de chef, bouton de confirmation (US-32). Le propriétaire cible devient chef ; moi, second.
+
+        Règles appliquées :
+        - Seul le chef peut le faire (RG15, RG74) → sinon 403 `NOT_CHIEF`.
+        - La cible doit être un second du chien (pas une invitation en attente) → sinon 404 `OWNER_NOT_FOUND`.
+        - Un seul chef par chien, à tout instant (RG73) : les deux rôles changent dans la même transaction.
+      x-status: provisoire
+      x-depends-on: [T1]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Rôle transféré ; liste des propriétaires à jour.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/PetOwner' }
+        '401':
+          description: Jeton d'accès absent ou expiré.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '403':
+          description: Je ne suis pas le chef de ce chien.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              example: { status: 403, code: NOT_CHIEF, title: Not chief }
+        '404':
+          description: Chien introuvable (`PET_NOT_FOUND`) ou cible qui n'est pas un second du chien (`OWNER_NOT_FOUND`).
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+  /pets/{petId}/invitations:
+    parameters:
+      - { name: petId, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Partage]
+      operationId: inviteOwner
+      summary: Inviter un propriétaire second
+      description: |
+        S18 → « Inviter un propriétaire » (US-23) : e-mail de la personne. Elle rejoint le chien comme second après avoir accepté (Q3, acceptation explicite).
+
+        Règles appliquées :
+        - Seul le chef invite (texte de S18 : « Seul le propriétaire chef peut lui donner ce rôle ») → sinon 403 `NOT_CHIEF`.
+        - Une seule invitation en attente par chien et par e-mail (RG76) → 409 `INVITATION_ALREADY_PENDING`.
+        - E-mail déjà propriétaire du chien (dont le mien) → 409 `ALREADY_OWNER`.
+        - L'invité peut ne pas avoir de compte : il verra l'invitation après inscription avec cet e-mail. L'envoi de l'e-mail d'invitation est hors de ce contrat (NOTIFICATION, I9).
+        - Pas d'expiration ni d'annulation au MVP (aucun écran).
+      x-status: provisoire
+      x-depends-on: [T1, Q3]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [email]
+              properties:
+                email: { type: string, format: email, maxLength: 255 }
+            example: { email: lea.moreau@example.com }
+      responses:
+        '201':
+          description: Invitation créée (en attente).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PetOwner' }
+        '400':
+          description: "E-mail invalide (`VALIDATION_FAILED`, codes `REQUIRED`, `INVALID_EMAIL`)."
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ValidationProblem' }
+        '401':
+          description: Jeton d'accès absent ou expiré.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '403':
+          description: Je ne suis pas le chef de ce chien.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              example: { status: 403, code: NOT_CHIEF, title: Not chief }
+        '404':
+          description: Chien inexistant ou d'un autre compte.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              example: { status: 404, code: PET_NOT_FOUND, title: Pet not found }
+        '409':
+          description: Invitation déjà en attente (`INVITATION_ALREADY_PENDING`, RG76) ou personne déjà propriétaire (`ALREADY_OWNER`).
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+  /me/invitations:
+    get:
+      tags: [Partage]
+      operationId: listMyInvitations
+      summary: Lister les invitations que j'ai reçues
+      description: |
+        Écran à ajouter dans la maquette (M6) : invitations en attente adressées à mon e-mail, avec le chien et la personne qui invite.
+
+        Règles appliquées :
+        - Correspondance sur l'e-mail du compte, sans tenir compte de la casse (RG10).
+        - Seulement les invitations `pending`.
+      x-status: provisoire
+      x-depends-on: [T1, Q3]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Mes invitations en attente.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/ReceivedInvitation' }
+        '401':
+          description: Jeton d'accès absent ou expiré.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+  /invitations/{invitationId}/accept:
+    parameters:
+      - { name: invitationId, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Partage]
+      operationId: acceptInvitation
+      summary: Accepter une invitation
+      description: |
+        Écran M6. Crée mon lien *posséder* avec le rôle second (RG75) ; l'invitation passe `accepted` (`responded_at`). Le chien apparaît dans `GET /pets`.
+      x-status: provisoire
+      x-depends-on: [T1, Q3]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Invitation acceptée ; le chien rejoint ma liste.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Pet' }
+        '401':
+          description: Jeton d'accès absent ou expiré.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '404':
+          description: Invitation inexistante, déjà traitée ou adressée à un autre e-mail.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              example: { status: 404, code: INVITATION_NOT_FOUND, title: Invitation not found }
+
+  /invitations/{invitationId}/decline:
+    parameters:
+      - { name: invitationId, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Partage]
+      operationId: declineInvitation
+      summary: Refuser une invitation
+      description: |
+        Écran M6. L'invitation passe `declined` (`responded_at`) ; le chef peut en envoyer une nouvelle.
+      x-status: provisoire
+      x-depends-on: [T1, Q3]
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Invitation refusée.
+        '401':
+          description: Jeton d'accès absent ou expiré.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '404':
+          description: Invitation inexistante, déjà traitée ou adressée à un autre e-mail.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              example: { status: 404, code: INVITATION_NOT_FOUND, title: Invitation not found }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Jeton d'accès court (convention 6, dépend de T1).
+
+  schemas:
+    RegisterRequest:
+      type: object
+      additionalProperties: false
+      required: [firstName, lastName, email, password, acceptedTermsVersion]
+      properties:
+        firstName: { type: string, minLength: 1, maxLength: 100 }
+        lastName: { type: string, minLength: 1, maxLength: 100 }
+        email: { type: string, format: email, maxLength: 255 }
+        phoneNumber:
+          type: [string, 'null']
+          maxLength: 20
+          description: Facultatif (BDD nullable ; la maquette le demande sans l'exiger). Format E.164.
+        password:
+          type: string
+          minLength: 8
+          maxLength: 128
+          writeOnly: true
+          description: 8 caractères minimum (hypothèse D14 ; la maquette en demande 6).
+        acceptedTermsVersion:
+          type: string
+          maxLength: 20
+          description: Version des CGU acceptée par l'utilisateur (RG11, D13).
+
+    LoginRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email: { type: string, format: email, maxLength: 255 }
+        password: { type: string, maxLength: 128, writeOnly: true }
+
+    User:
+      type: object
+      required: [id, firstName, lastName, email, phoneNumber, registeredAt]
+      properties:
+        id: { type: string, format: uuid }
+        firstName: { type: string }
+        lastName: { type: string }
+        email: { type: string, format: email }
+        phoneNumber: { type: [string, 'null'] }
+        registeredAt: { type: string, format: date-time }
+
+    UpdateMeRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        firstName: { type: string, minLength: 1, maxLength: 100 }
+        lastName: { type: string, minLength: 1, maxLength: 100 }
+        email: { type: string, format: email, maxLength: 255 }
+        phoneNumber:
+          type: [string, 'null']
+          maxLength: 20
+          description: Format E.164 ; `null` efface le numéro.
+
+    Preferences:
+      type: object
+      required: [deviceLocationSharing, healthNotifications, anonymizedDataSharing]
+      properties:
+        deviceLocationSharing:
+          type: boolean
+          description: Position du téléphone de l'utilisateur envoyée à Pawrise (pas celle du chien). Vrai par défaut.
+        healthNotifications:
+          type: boolean
+          description: Alertes en cas d'anomalie de santé détectée. Vrai par défaut.
+        anonymizedDataSharing:
+          type: boolean
+          description: Consentement à l'usage des données anonymisées pour la recherche vétérinaire. Faux par défaut (RGPD, consentement explicite).
+
+    UpdatePreferencesRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        deviceLocationSharing: { type: boolean }
+        healthNotifications: { type: boolean }
+        anonymizedDataSharing: { type: boolean }
+
+    Pet:
+      type: object
+      required: [id, name, photoUrl, photoSample, birthDate, sex, breeds, weightKg, heightCm, medicalNotes, myRole, collarSerial]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string, maxLength: 100 }
+        photoUrl: { type: [string, 'null'], format: uri, description: "Ma propre photo, hébergée par Pawrise. `null` si photo d'exemple ou aucune photo." }
+        photoSample:
+          oneOf:
+            - { $ref: '#/components/schemas/SamplePhotoKey' }
+            - { type: 'null' }
+          description: "Clé de la photo d'exemple embarquée dans l'app. `photoUrl` et `photoSample` à `null` : l'app affiche `sample_1`."
+        birthDate: { type: [string, 'null'], format: date }
+        sex:
+          type: string
+          enum: [male, female, unknown]
+          description: "`unknown` = « non renseigné » dans la maquette (D2)."
+        breeds:
+          type: array
+          description: Race principale en premier (`pet_breed.is_primary`). Liste vide = race inconnue (D2).
+          items: { $ref: '#/components/schemas/Breed' }
+        weightKg: { type: [number, 'null'], description: Dernière pesée. }
+        heightCm: { type: [number, 'null'], description: Absent de la BDD (D2). }
+        medicalNotes: { type: [string, 'null'], description: Infos santé en texte libre ; absent de la BDD (D2). }
+        myRole:
+          type: string
+          enum: [chief, secondary]
+          description: Mon rôle sur ce chien (RG15, `pet_owner.owner_role`).
+        collarSerial:
+          type: [string, 'null']
+          description: Code du collier associé (`PW-XXXXXX` = `serial_number`, D9) ; `null` si aucun collier.
+
+    CreatePetRequest:
+      type: object
+      additionalProperties: false
+      required: [name, sex]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 100 }
+        birthDate: { type: [string, 'null'], format: date }
+        sex:
+          type: string
+          enum: [male, female, unknown]
+          description: La maquette exige mâle ou femelle ; l'API accepte aussi `unknown` (D2).
+        breedCodes:
+          type: array
+          default: []
+          items: { type: string }
+          description: Codes de `GET /breeds`, race principale en premier. Vide = race inconnue.
+        weightKg: { type: [number, 'null'], exclusiveMinimum: 0 }
+        heightCm: { type: [number, 'null'], exclusiveMinimum: 0 }
+        medicalNotes: { type: [string, 'null'], maxLength: 2000 }
+
+    PetOwner:
+      type: object
+      required: [userId, name, email, role, isMe, invitationId]
+      properties:
+        userId: { type: [string, 'null'], format: uuid, description: "`null` pour une invitation en attente." }
+        name: { type: [string, 'null'], description: "Prénom + nom ; `null` pour une invitation en attente." }
+        email: { type: string, format: email }
+        role: { type: string, enum: [chief, secondary, pending] }
+        isMe: { type: boolean, description: "« vous » dans la maquette." }
+        invitationId: { type: [string, 'null'], format: uuid }
+
+    ReceivedInvitation:
+      type: object
+      required: [id, invitedAt, pet, invitedBy]
+      properties:
+        id: { type: string, format: uuid }
+        invitedAt: { type: string, format: date-time }
+        pet:
+          type: object
+          required: [id, name, photoUrl, photoSample]
+          properties:
+            id: { type: string, format: uuid }
+            name: { type: string }
+            photoUrl: { type: [string, 'null'], format: uri }
+            photoSample:
+              oneOf: [{ $ref: '#/components/schemas/SamplePhotoKey' }, { type: 'null' }]
+        invitedBy:
+          type: object
+          required: [name, email]
+          properties:
+            name: { type: string }
+            email: { type: string, format: email }
+
+    ChatMessage:
+      type: object
+      required: [id, role, content, sentAt, quickReplies]
+      properties:
+        id: { type: string, format: uuid }
+        role: { type: string, enum: [owner, ai, vet], description: "`message.sender_role` ; `vet` réservé à l'escalade (hors sprint 1)." }
+        content: { type: string }
+        sentAt: { type: string, format: date-time }
+        quickReplies:
+          type: array
+          items: { type: string }
+          description: Suggestions de réponse proposées par l'IA (vide sinon) ; nouvelle colonne `message.quick_replies` (D12).
+
+    Notification:
+      type: object
+      required: [id, petId, kind, title, createdAt, read, alertId, reminderId]
+      properties:
+        id: { type: string, format: uuid }
+        petId: { type: string, format: uuid }
+        kind:
+          type: string
+          enum: [health, map, reminder, vet]
+          description: Écran à ouvrir au toucher (Santé, Localisation, Rappels, Rendez-vous).
+        title: { type: string, description: Texte affiché, en français (généré par l'API). }
+        createdAt: { type: string, format: date-time }
+        read: { type: boolean }
+        alertId: { type: [string, 'null'], format: uuid, description: Alerte à l'origine de la notification. }
+        reminderId: { type: [string, 'null'], format: uuid, description: Rappel concerné. }
+
+    Zone:
+      type: object
+      required: [id, petId, name, emoji, latitude, longitude, radiusM, alertsEnabled, petInside]
+      properties:
+        id: { type: string, format: uuid }
+        petId: { type: string, format: uuid }
+        name: { type: string, maxLength: 100 }
+        emoji: { type: string, maxLength: 8 }
+        latitude: { type: number, description: Centre, degrés WGS84. }
+        longitude: { type: number }
+        radiusM: { type: integer, minimum: 20, maximum: 2000 }
+        alertsEnabled: { type: boolean, description: Alerte de sortie active. }
+        petInside: { type: [boolean, 'null'], description: "Chien dans la zone à sa dernière position ; `null` sans position." }
+
+    CreateZoneRequest:
+      type: object
+      additionalProperties: false
+      required: [name, latitude, longitude, radiusM]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 100 }
+        emoji: { type: string, maxLength: 8, default: "📍" }
+        latitude: { type: number, minimum: -90, maximum: 90 }
+        longitude: { type: number, minimum: -180, maximum: 180 }
+        radiusM: { type: integer, minimum: 20, maximum: 2000 }
+        alertsEnabled: { type: boolean, default: true }
+
+    UpdateZoneRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        name: { type: string, minLength: 1, maxLength: 100 }
+        emoji: { type: string, maxLength: 8 }
+        latitude: { type: number, minimum: -90, maximum: 90 }
+        longitude: { type: number, minimum: -180, maximum: 180 }
+        radiusM: { type: integer, minimum: 20, maximum: 2000 }
+        alertsEnabled: { type: boolean }
+
+    GeoPoint:
+      type: object
+      required: [latitude, longitude, recordedAt]
+      properties:
+        latitude: { type: number, description: Degrés WGS84 (convention 8). }
+        longitude: { type: number }
+        recordedAt: { type: string, format: date-time }
+
+    PetLocation:
+      type: object
+      required: [latitude, longitude, recordedAt, stale, connected, batteryPct, collarSerial]
+      properties:
+        latitude: { type: [number, 'null'] }
+        longitude: { type: [number, 'null'] }
+        recordedAt: { type: [string, 'null'], format: date-time, description: Heure de la dernière position reçue. }
+        stale: { type: boolean, description: Position de plus de 3 min. }
+        connected: { type: boolean }
+        batteryPct: { type: [integer, 'null'], minimum: 0, maximum: 100 }
+        collarSerial: { type: string }
+
+    ReminderKind:
+      type: string
+      enum: [vaccine, treatment, other]
+      description: "« Vaccin », « Traitement », « Autre soin »."
+
+    Reminder:
+      type: object
+      required: [id, petId, kind, title, dueAt, doneAt, status]
+      properties:
+        id: { type: string, format: uuid }
+        petId: { type: string, format: uuid }
+        kind: { $ref: '#/components/schemas/ReminderKind' }
+        title: { type: string, maxLength: 100 }
+        dueAt: { type: string, format: date-time, description: Échéance (date et heure, comme la maquette). }
+        doneAt: { type: [string, 'null'], format: date-time }
+        status: { type: string, enum: [upcoming, overdue, done], description: Calculé par l'API. }
+
+    CreateReminderRequest:
+      type: object
+      additionalProperties: false
+      required: [kind, title, dueAt]
+      properties:
+        kind: { $ref: '#/components/schemas/ReminderKind' }
+        title: { type: string, minLength: 1, maxLength: 100 }
+        dueAt: { type: string, format: date-time }
+
+    UpdateReminderRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        kind: { $ref: '#/components/schemas/ReminderKind' }
+        title: { type: string, minLength: 1, maxLength: 100 }
+        dueAt: { type: string, format: date-time }
+        done: { type: boolean, description: "`true` = marquer effectué ; `false` = rouvrir." }
+
+    IndicatorCode:
+      type: string
+      enum: [heart_rate, atrial_fibrillation, activity, sleep, temperature]
+
+    IndicatorDetail:
+      type: object
+      required: [indicator, period, unit, state, current, message, detail, normalRange, points]
+      properties:
+        indicator: { $ref: '#/components/schemas/IndicatorCode' }
+        period: { type: string, enum: [today, 7d, 30d] }
+        unit: { type: string, enum: [bpm, count, min, celsius], description: "Fixe par indicateur ; exception à la convention 8 (unité dans le nom du champ), car la série est commune aux 5 indicateurs." }
+        state:
+          oneOf: [{ $ref: '#/components/schemas/HealthState' }, { type: 'null' }]
+        current: { type: [number, 'null'], description: "Valeur actuelle (titre de l'écran), dans `unit`." }
+        message: { type: [string, 'null'], description: Message simple, sans connaissance médicale (IA-ENGINE). }
+        detail: { type: [string, 'null'], description: Explication un peu plus poussée (IA-ENGINE). }
+        normalRange:
+          oneOf:
+            - type: object
+              required: [min, max]
+              properties:
+                min: { type: number }
+                max: { type: number }
+            - { type: 'null' }
+          description: Plage habituelle tracée sur la courbe ; `null` si l'indicateur n'en a pas.
+        points:
+          type: array
+          items:
+            type: object
+            required: [at, value]
+            properties:
+              at: { type: string, format: date-time, description: Début de l'heure ou du jour (UTC). }
+              value: { type: [number, 'null'] }
+
+    HealthState:
+      type: string
+      enum: [good, watch, alert]
+      description: "« Tout va bien », « À surveiller », « Alerte » dans la maquette."
+
+    HealthDashboard:
+      type: object
+      required: [score, state, summary, indicators, collar]
+      properties:
+        score: { type: [integer, 'null'], minimum: 0, maximum: 100, description: Score bien-être (IA-ENGINE). }
+        state:
+          oneOf: [{ $ref: '#/components/schemas/HealthState' }, { type: 'null' }]
+        summary: { type: [string, 'null'], description: Message de synthèse en langage simple (IA-ENGINE). }
+        indicators:
+          type: object
+          required: [heartRate, atrialFibrillation, activity, sleep, temperature]
+          description: Les 5 indicateurs du MVP. Chaque indicateur vaut `null` sans mesure.
+          properties:
+            heartRate:
+              oneOf:
+                - type: object
+                  required: [state, heartRateBpm]
+                  properties:
+                    state: { $ref: '#/components/schemas/HealthState' }
+                    heartRateBpm: { type: integer, description: Moyenne des dernières 24 h. }
+                - { type: 'null' }
+            atrialFibrillation:
+              oneOf:
+                - type: object
+                  required: [state, irregularBeatDetected]
+                  properties:
+                    state: { $ref: '#/components/schemas/HealthState' }
+                    irregularBeatDetected: { type: boolean }
+                - { type: 'null' }
+            activity:
+              oneOf:
+                - type: object
+                  required: [state, activityMin]
+                  properties:
+                    state: { $ref: '#/components/schemas/HealthState' }
+                    activityMin: { type: integer, description: Minutes actives depuis minuit. }
+                - { type: 'null' }
+            sleep:
+              oneOf:
+                - type: object
+                  required: [state, sleepMin]
+                  properties:
+                    state: { $ref: '#/components/schemas/HealthState' }
+                    sleepMin: { type: integer, description: Sommeil de la dernière nuit. }
+                - { type: 'null' }
+            temperature:
+              oneOf:
+                - type: object
+                  required: [state, temperatureC]
+                  properties:
+                    state: { $ref: '#/components/schemas/HealthState' }
+                    temperatureC: { type: number, description: Dernière mesure. }
+                - { type: 'null' }
+        collar:
+          oneOf:
+            - type: object
+              required: [batteryPct, connected, lastSeenAt]
+              properties:
+                batteryPct: { type: [integer, 'null'], minimum: 0, maximum: 100 }
+                connected: { type: boolean }
+                lastSeenAt: { type: [string, 'null'], format: date-time, description: "« Dernières mesures reçues » quand le collier est déconnecté." }
+            - { type: 'null' }
+          description: "`null` si le chien n'a pas de collier."
+
+    Collar:
+      type: object
+      required: [serialNumber, model, batteryPct, connected, lastSeenAt, assignedAt]
+      properties:
+        serialNumber: { type: string, description: "Code `PW-XXXXXX` (D9)." }
+        model: { type: string, description: "`collar.hardware_version` ; l'app affiche « Pawrise Collar <model> »." }
+        batteryPct: { type: [integer, 'null'], minimum: 0, maximum: 100, description: "Dernière mesure (TimescaleDB) ; `null` si aucune mesure reçue." }
+        connected: { type: boolean, description: "Dernière mesure récente (« Signal fort » / « Déconnecté »)." }
+        lastSeenAt: { type: [string, 'null'], format: date-time }
+        assignedAt: { type: string, format: date-time }
+
+    SetCollarRequest:
+      type: object
+      additionalProperties: false
+      required: [serialNumber]
+      properties:
+        serialNumber: { type: string, maxLength: 50, description: "Code scanné ou saisi, `PW-` + 6 caractères." }
+
+    UpdatePetRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        name: { type: string, minLength: 1, maxLength: 100 }
+        birthDate: { type: [string, 'null'], format: date }
+        sex: { type: string, enum: [male, female, unknown] }
+        breedCodes: { type: array, items: { type: string }, description: Remplace toute la liste ; race principale en premier ; vide = race inconnue. }
+        weightKg: { type: number, exclusiveMinimum: 0, description: Ajoute une pesée. }
+        heightCm: { type: [number, 'null'], exclusiveMinimum: 0 }
+        medicalNotes: { type: [string, 'null'], maxLength: 2000 }
+
+    SamplePhotoKey:
+      type: string
+      enum: [sample_1, sample_2, sample_3, sample_4]
+      description: "Photos d'exemple embarquées dans l'app (`pawrise-figma/src/data/mock.ts`, `samplePhotos`, dans l'ordre). Stockée telle quelle dans `pet.photo`. Ajouter un exemple = nouvelle version de l'app + ce enum."
+
+    SamplePhotoRequest:
+      type: object
+      additionalProperties: false
+      required: [sample]
+      properties:
+        sample: { $ref: '#/components/schemas/SamplePhotoKey' }
+
+    Breed:
+      type: object
+      required: [code, name]
+      properties:
+        code: { type: string, description: "`breed_code`." }
+        name: { type: string }
+
+    AuthTokens:
+      type: object
+      required: [accessToken, refreshToken]
+      properties:
+        accessToken: { type: string, description: Jeton court (≈ 15 min). }
+        refreshToken: { type: string, description: "Jeton long, à usage unique, échangé via POST /auth/refresh." }
+
+    AuthSession:
+      allOf:
+        - $ref: '#/components/schemas/AuthTokens'
+        - type: object
+          required: [user]
+          properties:
+            user: { $ref: '#/components/schemas/User' }
+
+    RefreshRequest:
+      type: object
+      additionalProperties: false
+      required: [refreshToken]
+      properties:
+        refreshToken: { type: string }
+
+    Problem:
+      type: object
+      description: Erreur au format Problem Details (RFC 9457), convention 4.
+      required: [status, code, title]
+      properties:
+        status: { type: integer }
+        code: { type: string, description: Code stable lu par l'app. }
+        title: { type: string }
+        detail: { type: string }
+
+    ValidationProblem:
+      allOf:
+        - $ref: '#/components/schemas/Problem'
+        - type: object
+          required: [errors]
+          properties:
+            errors:
+              type: array
+              items:
+                type: object
+                required: [field, code]
+                properties:
+                  field: { type: string }
+                  code: { type: string }
