@@ -90,7 +90,7 @@ class ScreenCaptureTest {
         compose.field("E-mail").performTextInput("alex@example.com")
         compose.field("Mot de passe").performTextInput("chien-26")
         compose.tap("Se connecter")
-        compose.tap("Paramètres")
+        compose.onNode(androidx.compose.ui.test.hasContentDescription("Paramètres")).performClick()
         compose.snapshot("I02")
         compose.onNodeWithTag("settings-version").performScrollTo()
         compose.snapshot("I02L")
