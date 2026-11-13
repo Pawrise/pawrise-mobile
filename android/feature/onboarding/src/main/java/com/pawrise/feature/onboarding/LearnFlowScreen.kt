@@ -1,7 +1,6 @@
 package com.pawrise.feature.onboarding
 
 import androidx.activity.compose.BackHandler
-import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -28,7 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.selected
@@ -46,28 +45,28 @@ import com.pawrise.core.designsystem.theme.PwRadius
 import com.pawrise.core.designsystem.theme.PwText
 import kotlinx.coroutines.launch
 
-internal data class LearnStep(val short: String, @DrawableRes val icon: Int, val title: String, val hint: String)
+internal data class LearnStep(val short: String, val icon: ImageVector, val title: String, val hint: String)
 
 /** Textes de la maquette (pawrise-figma `auth/LearnFlow.tsx`, Figma 2025:1885 → 2025:2011). */
 internal val LEARN_STEPS = listOf(
     LearnStep(
-        "App", R.drawable.ic_learn_paw, "Pawrise veille sur votre chien",
+        "App", PwIcons.Paw, "Pawrise veille sur votre chien",
         "Le collier mesure sa santé et indique où il se trouve. Vous consultez tout dans l'application.",
     ),
     LearnStep(
-        "Collier", R.drawable.ic_learn_signal, "Allumez le collier",
+        "Collier", PwIcons.Signal, "Allumez le collier",
         "Maintenez le bouton du boîtier jusqu'au voyant. Le collier se réveille et se prépare à transmettre.",
     ),
     LearnStep(
-        "Mesures", R.drawable.ic_learn_heart, "Les mesures arrivent",
+        "Mesures", PwIcons.Heart, "Les mesures arrivent",
         "Rythme cardiaque, activité, sommeil et température s'affichent dans Santé dès que le collier envoie ses données.",
     ),
     LearnStep(
-        "Alerte", R.drawable.ic_learn_alert, "Un rendez-vous en cas de danger",
+        "Alerte", PwIcons.Alert, "Un rendez-vous en cas de danger",
         "Si une alerte s'affiche, ouvrez Rendez-vous et réservez un vétérinaire pour votre chien.",
     ),
     LearnStep(
-        "Position", R.drawable.ic_learn_map, "Suivez sa position",
+        "Position", PwIcons.Map, "Suivez sa position",
         "L'onglet Localisation montre où se trouve votre chien, pour le retrouver rapidement.",
     ),
 )
@@ -142,7 +141,7 @@ private fun LearnPage(page: LearnStep) {
         Box(
             Modifier.size(96.dp).background(PwColors.SurfaceElevated, CircleShape),
             contentAlignment = Alignment.Center,
-        ) { Icon(painterResource(page.icon), contentDescription = null, tint = PwColors.Action, modifier = Modifier.size(40.dp)) }
+        ) { Icon(page.icon, contentDescription = null, tint = PwColors.Action, modifier = Modifier.size(40.dp)) }
         Text(
             page.title,
             style = PwText.display(26f),

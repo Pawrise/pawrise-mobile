@@ -9,53 +9,44 @@ import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.unit.dp
 
 /**
- * Icônes de la maquette (tracés SVG 24×24 de pawrise-figma `components/Icon.tsx`).
- * Trait couleur courante : la teinte vient de `Icon(tint = …)`.
+ * Icônes de la maquette, dessinées avec Lucide (`LucidePaths`, généré par scripts/lucide_icons.py) : les tracés
+ * exportés de Figma sont déformés (traits vectorisés). Même source que l'app iOS. Teinte : `Icon(tint = …)`.
  */
 object PwIcons {
-    val ChevronLeft = stroke("ChevronLeft", "m15 6-6 6 6 6")
-    val ChevronRight = stroke("ChevronRight", "m9 6 6 6-6 6")
-    val Close = stroke("Close", "M6 6l12 12M18 6 6 18")
-    val Check = stroke("Check", "m5 12 5 5L20 6")
-    val Plus = stroke("Plus", "M12 5v14M5 12h14")
-    val Heart = stroke("Heart", "M12 20s-7-4.5-9.5-9C1 8 2.5 4.5 6 4.5c2 0 3.2 1.2 4 2.5.8-1.3 2-2.5 4-2.5 3.5 0 5 3.5 3.5 6.5C19 15.5 12 20 12 20Z")
-    val Signal = stroke("Signal", "M4 18v-3M9 18v-6M14 18v-9M19 18V6")
-    val Alert = stroke("Alert", "M12 3 2 20h20L12 3Z", "M12 10v4M12 17h.01")
-    val Map = stroke("Map", "M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2Z", "M9 4v14M15 6v14")
-    val Pulse = stroke("Pulse", "M2 12h4l2-5 4 12 2.5-9 1.5 2H22")
-    val Female = stroke("Female", "M12 15a5 5 0 1 0 0-10 5 5 0 0 0 0 10Z", "M12 15v6M9 18h6")
-    val Male = stroke("Male", "M10 20a6 6 0 1 0 0-12 6 6 0 0 0 0 12Z", "M14.5 9.5 20 4M15 4h5v5")
-    val Search = stroke("Search", "M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14Z", "m20 20-4-4")
+    val ChevronLeft = lucide("ChevronLeft", LucidePaths.ChevronLeft)
+    val ChevronRight = lucide("ChevronRight", LucidePaths.ChevronRight)
+    val Close = lucide("Close", LucidePaths.Close)
+    val Check = lucide("Check", LucidePaths.Check)
+    val Plus = lucide("Plus", LucidePaths.Plus)
+    val Heart = lucide("Heart", LucidePaths.Heart)
+    val Signal = lucide("Signal", LucidePaths.Signal)
+    val Alert = lucide("Alert", LucidePaths.Alert)
+    val AlertCircle = lucide("AlertCircle", LucidePaths.AlertCircle)
+    val Map = lucide("Map", LucidePaths.Map)
+    val Pulse = lucide("Pulse", LucidePaths.Pulse)
+    val Activity = lucide("Activity", LucidePaths.Activity)
+    val Moon = lucide("Moon", LucidePaths.Moon)
+    val Thermometer = lucide("Thermometer", LucidePaths.Thermometer)
+    val Battery = lucide("Battery", LucidePaths.Battery)
+    val Swap = lucide("Swap", LucidePaths.Swap)
+    val Chat = lucide("Chat", LucidePaths.Chat)
+    val Settings = lucide("Settings", LucidePaths.Settings)
+    val Doc = lucide("Doc", LucidePaths.Doc)
+    val Shield = lucide("Shield", LucidePaths.Shield)
+    val Send = lucide("Send", LucidePaths.Send)
+    val User = lucide("User", LucidePaths.User)
+    val Lock = lucide("Lock", LucidePaths.Lock)
+    val Trash = lucide("Trash", LucidePaths.Trash)
+    val Logout = lucide("Logout", LucidePaths.Logout)
+    val Search = lucide("Search", LucidePaths.Search)
+    val Mail = lucide("Mail", LucidePaths.Mail)
+    val Smartphone = lucide("Smartphone", LucidePaths.Smartphone)
 
-    /** Patte pleine (icône « paw » de la maquette). */
-    val Paw: ImageVector = ImageVector.Builder("Paw", 24.dp, 24.dp, 24f, 24f).apply {
-        listOf(
-            "M7 7.3a1.7 1.7 0 1 1 0 3.4 1.7 1.7 0 0 1 0-3.4Z",
-            "M12 5.3a1.7 1.7 0 1 1 0 3.4 1.7 1.7 0 0 1 0-3.4Z",
-            "M17 7.3a1.7 1.7 0 1 1 0 3.4 1.7 1.7 0 0 1 0-3.4Z",
-            "M12 12c-2.5 0-4.5 2-4.5 4S9 21 12 21s4.5-1 4.5-3-2-4-4.5-4Z",
-        ).forEach { addPath(pathData = addPathNodes(it), fill = SolidColor(Color.Black)) }
-    }.build()
-
-    /** QR code stylisé (bouton « Scanner le QR code »). */
-    val Qr: ImageVector = ImageVector.Builder("Qr", 24.dp, 24.dp, 24f, 24f).apply {
-        addPath(
-            pathData = addPathNodes(
-                "M3 3h7v7H3V3Zm2 2v3h3V5H5Zm9-2h7v7h-7V3Zm2 2v3h3V5h-3ZM3 14h7v7H3v-7Zm2 2v3h3v-3H5Zm9 0h2v2h-2v-2Zm2 2h2v-2h-2v-4h-2v2h-2v2h2v4h2v-2Zm0 0h2v2h-2v-2Zm2 0h2v2h-2v-2Zm0-4h2v2h-2v-2Z",
-            ),
-            fill = SolidColor(Color.Black),
-        )
-    }.build()
-
-    /** Patte au trait (icône `Icon/paw` des écrans Découverte). */
-    val PawOutline = stroke(
-        "PawOutline",
-        circle(7f, 9f, 1.7f), circle(12f, 7f, 1.7f), circle(17f, 9f, 1.7f),
-        "M12 12c-2.5 0-4.5 2-4.5 4S9 21 12 21s4.5-1 4.5-3-2-4-4.5-4Z",
-    )
+    /** Patte (Lucide « paw-print ») : Découverte, avatar sans photo, Chat IA. */
+    val Paw = lucide("Paw", LucidePaths.Paw)
 
     /** Chevron « Retour » des écrans Découverte (trait 2 pour 20 dp, maquette A04–A07). */
-    val ChevronLeftBold = stroke("ChevronLeftBold", "m15 6-6 6 6 6", width = 2.4f)
+    val ChevronLeftBold = lucide("ChevronLeftBold", LucidePaths.ChevronLeft, width = 2.4f)
 
     /** QR code de la maquette (cadre de scan A18, 120 × 120). */
     val QrCode: ImageVector = ImageVector.Builder("QrCode", 120.dp, 120.dp, 120f, 120f).apply {
@@ -68,9 +59,8 @@ object PwIcons {
         )
     }.build()
 
-    private fun circle(cx: Float, cy: Float, r: Float) = "M${cx - r} ${cy}a$r $r 0 1 0 ${2 * r} 0a$r $r 0 1 0 ${-2 * r} 0Z"
-
-    private fun stroke(name: String, vararg paths: String, width: Float = 1.9f): ImageVector =
+    /** Icône au trait sur la grille 24 de Lucide (trait 1,9 de la maquette), teinte donnée par `Icon(tint = …)`. */
+    fun lucide(name: String, paths: List<String>, width: Float = 1.9f): ImageVector =
         ImageVector.Builder(name, 24.dp, 24.dp, 24f, 24f).apply {
             paths.forEach {
                 addPath(

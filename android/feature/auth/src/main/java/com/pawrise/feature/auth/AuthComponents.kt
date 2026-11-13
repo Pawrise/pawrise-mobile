@@ -1,6 +1,5 @@
 package com.pawrise.feature.auth
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -30,13 +29,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -55,6 +50,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.pawrise.core.designsystem.component.LucidePaths
 import com.pawrise.core.designsystem.component.PwIcons
 import com.pawrise.core.designsystem.theme.bricolageGrotesque
 import com.pawrise.core.designsystem.theme.Inter
@@ -314,11 +310,7 @@ internal fun TermsCheckbox(checked: Boolean, onChange: (Boolean) -> Unit, enable
                 contentAlignment = Alignment.Center,
             ) {
                 if (checked) {
-                    Canvas(Modifier.size(12.dp)) {
-                        val w = size.width
-                        drawLine(PwColors.ActionText, Offset(w * 0.12f, w * 0.52f), Offset(w * 0.4f, w * 0.8f), 2.dp.toPx(), StrokeCap.Round)
-                        drawLine(PwColors.ActionText, Offset(w * 0.4f, w * 0.8f), Offset(w * 0.9f, w * 0.2f), 2.dp.toPx(), StrokeCap.Round)
-                    }
+                    Icon(CheckBold, contentDescription = null, tint = PwColors.ActionText, modifier = Modifier.size(14.dp))
                 }
             }
             Text(
@@ -337,18 +329,8 @@ internal fun Gap(height: Dp) = Spacer(Modifier.height(height))
 @Composable
 internal fun HGap(width: Dp) = Spacer(Modifier.width(width))
 
-private fun strokeIcon(name: String, vararg paths: String): ImageVector =
-    ImageVector.Builder(name, 24.dp, 24.dp, 24f, 24f).apply {
-        paths.forEach {
-            addPath(
-                pathData = addPathNodes(it),
-                stroke = SolidColor(Color.Black),
-                strokeLineWidth = 1.9f,
-                strokeLineCap = StrokeCap.Round,
-                strokeLineJoin = StrokeJoin.Round,
-            )
-        }
-    }.build()
+private val AlertCircle = PwIcons.AlertCircle
+private val Envelope = PwIcons.Mail
 
-private val AlertCircle = strokeIcon("AlertCircle", "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z", "M12 8v5M12 16h.01")
-private val Envelope = strokeIcon("Envelope", "M4 6h16v12H4V6Z", "m4 7 8 6 8-6")
+/** Coche de la case CGU (Lucide « check », trait 2 pour 14 dp). */
+private val CheckBold = PwIcons.lucide("CheckBold", LucidePaths.Check, width = 3.4f)
