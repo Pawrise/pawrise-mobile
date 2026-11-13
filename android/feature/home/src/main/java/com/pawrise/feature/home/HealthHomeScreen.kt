@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -194,7 +195,8 @@ private fun HealthHeaderCard(
             .fillMaxWidth()
             .background(state.surface, shape)
             .border(1.dp, PwColors.Border, shape)
-            .padding(16.dp),
+            // Figma : marges de 16 à l'intérieur du filet de 1 dp.
+            .padding(17.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Row(Modifier.fillMaxWidth().height(20.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -231,7 +233,11 @@ private fun HealthHeaderCard(
                 Text(
                     badge.label,
                     style = maquetteStyle(MaquetteFont.Inter, 11f, lineHeight = 1.4f, color = badge.tint),
-                    modifier = Modifier.background(badge.surface, CircleShape).padding(vertical = 4.dp, horizontal = 8.dp),
+                    // Maquette : badge de largeur fixe 80 (texte calé à gauche, marges 8).
+                    modifier = Modifier
+                        .widthIn(min = 80.dp)
+                        .background(badge.surface, CircleShape)
+                        .padding(vertical = 4.dp, horizontal = 8.dp),
                 )
             }
             ScoreRing(snapshot.score, state)

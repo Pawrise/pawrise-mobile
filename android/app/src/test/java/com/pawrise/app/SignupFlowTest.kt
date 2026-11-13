@@ -93,7 +93,7 @@ class SignupFlowTest {
         assertEquals(listOf("pet-new" to "PW-8A4F2C"), petRepository.collars)
 
         compose.tap("Voir le tableau de bord de Nala")
-        compose.onNodeWithText("Homepage · Santé", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("INDICATEURS").assertIsDisplayed()
 
         // Parcours terminé : le retour système ne rouvre pas l'onboarding.
         compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }

@@ -256,7 +256,8 @@ private fun AssistantBubble(text: String, urgent: Boolean = false) {
             .fillMaxWidth()
             .background(if (urgent) PwColors.StatusAlertSurface else PwColors.SurfaceCard, shape)
             .border(1.dp, if (urgent) PwColors.StatusAlert.copy(alpha = 0.4f) else PwColors.Border, shape)
-            .padding(horizontal = 16.dp, vertical = 11.dp)
+            // Figma : texte de 247 dp à 17 dp du bord gauche (filet compris).
+            .padding(start = 17.dp, end = 15.dp, top = 11.dp, bottom = 11.dp)
             .semantics(mergeDescendants = true) { },
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -266,15 +267,21 @@ private fun AssistantBubble(text: String, urgent: Boolean = false) {
                 Text("Urgence", style = maquetteStyle(MaquetteFont.Inter, 13f, FontWeight.SemiBold, color = PwColors.StatusAlert))
             }
         }
-        Text(text, style = bubbleStyle.copy(color = PwColors.TextPrimary))
+        Text(text.breakAfterHyphens(), style = bubbleStyle.copy(color = PwColors.TextPrimary))
     }
 }
+
+/**
+ * Coupure possible après un trait d'union (« souhaitez- / vous »), comme dans Figma et les navigateurs :
+ * Android ne coupe pas aux traits d'union sans césure automatique, d'où une espace sans chasse après chacun.
+ */
+internal fun String.breakAfterHyphens(): String = replace(Regex("(?<=\\p{L})-(?=\\p{L})"), "-\u200B")
 
 @Composable
 private fun OwnerBubble(text: String) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
         Text(
-            text,
+            text.breakAfterHyphens(),
             style = bubbleStyle.copy(color = PwColors.ActionText),
             modifier = Modifier
                 .widthIn(max = ChatLayout.bubbleWidth)
@@ -365,7 +372,8 @@ private fun QuickReply(title: String, minWidth: androidx.compose.ui.unit.Dp = 0.
             .background(PwColors.SurfaceElevated, CircleShape)
             .border(1.dp, PwColors.Action, CircleShape)
             .clickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 9.dp),
+            // Sur deux lignes : texte de 193 dp (comme iOS) pour couper « Comment va Nala aujourd'hui » / « ? ».
+            .padding(horizontal = if (wraps) 13.dp else 15.dp, vertical = 9.dp),
     ) {
         Text(
             title,

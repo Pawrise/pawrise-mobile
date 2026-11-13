@@ -123,7 +123,7 @@ fun HealthPanelHost(viewModel: HealthHomeViewModel, onAskAssistant: (String) -> 
     }
 }
 
-/** Panneau du bas : bord à bord, coins hauts 30, filet #D5E3EC, marges 12 / 20 / 32, glisser vers le bas pour fermer. */
+/** Panneau du bas : bord à bord, coins hauts 30, filet #D5E3EC, marges 12 / 20 / 32 (+ filet de 1 dp), glisser vers le bas pour fermer. */
 @Composable
 private fun HealthPanel(onClose: () -> Unit, content: @Composable () -> Unit) {
     val offset = remember { Animatable(0f) }
@@ -141,7 +141,7 @@ private fun HealthPanel(onClose: () -> Unit, content: @Composable () -> Unit) {
                 .semantics { paneTitle = "Détail" }
                 .verticalScroll(rememberScrollState())
                 .windowInsetsPadding(WindowInsets.navigationBars)
-                .padding(start = 20.dp, end = 20.dp, top = 13.dp, bottom = 32.dp),
+                .padding(start = 21.dp, end = 21.dp, top = 13.dp, bottom = 33.dp),
         ) {
             content()
         }

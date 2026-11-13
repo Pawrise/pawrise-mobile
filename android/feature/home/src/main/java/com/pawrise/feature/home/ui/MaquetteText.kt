@@ -30,6 +30,7 @@ fun maquetteStyle(
     // DM Mono : seule la graisse 500 est utilisée dans la maquette.
     fontWeight = if (font == MaquetteFont.Mono) FontWeight.Medium else weight,
     fontSize = size.sp,
+    letterSpacing = 0.sp,
     lineHeight = lineHeight?.let { (size * it).sp } ?: TextUnit.Unspecified,
     color = color,
     lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.None),
