@@ -10,6 +10,7 @@ import com.pawrise.core.pets.isValidCollarCode
 import com.pawrise.core.pets.normalizeCollarCode
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -44,18 +45,33 @@ class CollarPairingViewModel @Inject constructor(private val petRepository: PetR
     /** Code scanné refusé : la caméra le relit en continu, on ne le renvoie pas en boucle. */
     private var rejectedScan: String? = null
 
+    /** Activation en cours, annulée par « Retour » (A19). */
+    private var activation: Job? = null
+
     fun openScanner() = _state.update { it.copy(phase = CollarPhase.Scan, error = null) }
     fun openManual() = _state.update { it.copy(phase = CollarPhase.Manual, error = null) }
     fun onManualCode(value: String) = _state.update { it.copy(manualCode = collarInput(value), error = null) }
 
-    /** Retour : scan / saisie → choix ; `false` si l'écran doit laisser partir l'utilisateur. */
+    /**
+     * Retour (comme iOS) : scan / saisie → choix ; activation en cours → annulée, retour au choix ;
+     * collier activé → retour au choix (« Associer le collier »). `false` à l'écran de choix :
+     * l'écran laisse alors partir l'utilisateur.
+     */
     fun back(): Boolean = when (_state.value.phase) {
-        CollarPhase.Scan, CollarPhase.Manual -> {
-            _state.update { it.copy(phase = CollarPhase.Intro, error = null) }
+        CollarPhase.Scan, CollarPhase.Manual, CollarPhase.Activating, CollarPhase.Success -> {
+            activation?.cancel()
+            activation = null
+            rejectedScan = null
+            _state.update { it.copy(phase = CollarPhase.Intro, error = null, serialNumber = null) }
             true
         }
-        CollarPhase.Activating -> true // on attend la réponse
-        CollarPhase.Intro, CollarPhase.Success -> false
+        CollarPhase.Intro -> false
+    }
+
+    /** Fermer pendant l'activation : la requête en cours est abandonnée. */
+    fun cancel() {
+        activation?.cancel()
+        activation = null
     }
 
     fun submitManual(petId: String) {
@@ -76,7 +92,8 @@ class CollarPairingViewModel @Inject constructor(private val petRepository: PetR
 
     private fun activate(petId: String, code: String) {
         _state.update { it.copy(phase = CollarPhase.Activating, error = null) }
-        viewModelScope.launch {
+        activation?.cancel()
+        activation = viewModelScope.launch {
             val started = System.currentTimeMillis()
             val result = petRepository.setCollar(petId, code)
             delay((minActivationMillis - (System.currentTimeMillis() - started)).coerceAtLeast(0))

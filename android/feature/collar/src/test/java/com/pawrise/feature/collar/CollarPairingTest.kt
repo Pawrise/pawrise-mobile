@@ -83,7 +83,7 @@ class CollarPairingTest {
     }
 
     @Test
-    fun `ecran d'activation pendant l'appel, sans retour ni fermer`() {
+    fun `ecran d'activation pendant l'appel`() {
         val gate = CompletableDeferred<Unit>().also { pets.gate = it }
         start()
         tap("Saisir le code manuellement")
@@ -92,11 +92,42 @@ class CollarPairingTest {
 
         compose.onNodeWithText("Activation du collier…").assertIsDisplayed()
         compose.onNodeWithText("Nous connectons le collier de Nala à Pawrise. Un instant.").assertIsDisplayed()
-        compose.onNodeWithContentDescription("Fermer").assertDoesNotExist()
-        compose.onNodeWithContentDescription("Retour").assertDoesNotExist()
 
         gate.complete(Unit)
         waitFor("Le collier de Nala est activé")
+    }
+
+    @Test
+    fun `retour pendant l'activation l'annule et revient au choix, comme iOS`() {
+        val gate = CompletableDeferred<Unit>().also { pets.gate = it }
+        start()
+        tap("Saisir le code manuellement")
+        codeField().performTextInput("PW-8A4F2C")
+        tap("Activer le collier")
+        compose.onNodeWithText("Activation du collier…").assertIsDisplayed()
+
+        compose.onNodeWithContentDescription("Retour").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("Connectons le collier de Nala").assertIsDisplayed()
+
+        gate.complete(Unit)
+        compose.waitForIdle()
+        compose.onNodeWithText("Le collier de Nala est activé").assertDoesNotExist()
+        assertEquals(0, done)
+    }
+
+    @Test
+    fun `retour depuis collier active revient a associer le collier`() {
+        start()
+        tap("Saisir le code manuellement")
+        codeField().performTextInput("PW-8A4F2C")
+        tap("Activer le collier")
+        waitFor("Le collier de Nala est activé")
+
+        compose.onNodeWithContentDescription("Retour").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("Connectons le collier de Nala").assertIsDisplayed()
+        assertEquals(0, done)
     }
 
     @Test
@@ -177,7 +208,7 @@ class CollarPairingTest {
         tap("Scanner le QR code")
         tap("Saisir le code manuellement")
 
-        compose.onNodeWithText("Saisir le code d'activation").assertIsDisplayed()
+        compose.onNodeWithText("Saisir le code d’activation").assertIsDisplayed()
     }
 
     @Test

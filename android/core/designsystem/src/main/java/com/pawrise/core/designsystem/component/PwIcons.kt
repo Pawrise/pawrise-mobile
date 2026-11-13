@@ -47,13 +47,36 @@ object PwIcons {
         )
     }.build()
 
-    private fun stroke(name: String, vararg paths: String): ImageVector =
+    /** Patte au trait (icône `Icon/paw` des écrans Découverte). */
+    val PawOutline = stroke(
+        "PawOutline",
+        circle(7f, 9f, 1.7f), circle(12f, 7f, 1.7f), circle(17f, 9f, 1.7f),
+        "M12 12c-2.5 0-4.5 2-4.5 4S9 21 12 21s4.5-1 4.5-3-2-4-4.5-4Z",
+    )
+
+    /** Chevron « Retour » des écrans Découverte (trait 2 pour 20 dp, maquette A04–A07). */
+    val ChevronLeftBold = stroke("ChevronLeftBold", "m15 6-6 6 6 6", width = 2.4f)
+
+    /** QR code de la maquette (cadre de scan A18, 120 × 120). */
+    val QrCode: ImageVector = ImageVector.Builder("QrCode", 120.dp, 120.dp, 120f, 120f).apply {
+        addPath(
+            pathData = addPathNodes(
+                "M15 15h35v35H15zM25 25v15h15V25zM70 15h35v35H70zM80 25v15h15V25zM15 70h35v35H15zM25 80v15h15V80z" +
+                    "M70 80h10v10H70zM80 90h10V80H80V60H70v10H60v10h10v20h10V90zM80 90h10v10H80zM90 90h10v10H90zM90 70h10v10H90z",
+            ),
+            fill = SolidColor(Color.Black),
+        )
+    }.build()
+
+    private fun circle(cx: Float, cy: Float, r: Float) = "M${cx - r} ${cy}a$r $r 0 1 0 ${2 * r} 0a$r $r 0 1 0 ${-2 * r} 0Z"
+
+    private fun stroke(name: String, vararg paths: String, width: Float = 1.9f): ImageVector =
         ImageVector.Builder(name, 24.dp, 24.dp, 24f, 24f).apply {
             paths.forEach {
                 addPath(
                     pathData = addPathNodes(it),
                     stroke = SolidColor(Color.Black),
-                    strokeLineWidth = 1.9f,
+                    strokeLineWidth = width,
                     strokeLineCap = StrokeCap.Round,
                     strokeLineJoin = StrokeJoin.Round,
                 )

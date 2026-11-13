@@ -1,208 +1,219 @@
 package com.pawrise.feature.dogprofile
 
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.pawrise.core.designsystem.component.PwFieldError
+import com.pawrise.core.designsystem.component.PwFlowTextField
 import com.pawrise.core.designsystem.component.PwIcons
 import com.pawrise.core.designsystem.component.PwQuestion
+import com.pawrise.core.designsystem.component.pwFieldBox
 import com.pawrise.core.designsystem.theme.PwColors
-import com.pawrise.core.designsystem.theme.PwRadius
+import com.pawrise.core.designsystem.theme.PwText
 import com.pawrise.core.pets.SamplePhoto
 import com.pawrise.core.pets.Sex
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
+/** Une étape du profil (Figma 08 à 16) : question puis contenu, écarts 24, marges 20, 16 dp sous l'en-tête. */
 @Composable
 internal fun AddDogStepContent(state: AddDogUiState, actions: AddDogActions) {
     val dog = state.dogName
-    when (state.step) {
-        AddDogStep.Photo -> Scrollable {
-            PwQuestion("Ajoutez une photo de votre chien")
-            PhotoStep(state, actions)
-        }
-        AddDogStep.Name -> Scrollable {
-            PwQuestion("Comment s'appelle votre chien ?")
-            QuestionField(
-                value = state.name, onValueChange = actions.onName, a11yLabel = "Nom du chien", placeholder = "Ex. Rio",
-                keyboard = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
-            )
-        }
-        AddDogStep.BirthDate -> Scrollable {
-            PwQuestion(
-                "Quand est né${if (state.sex == Sex.Female) "e" else ""} $dog ?",
-                "Si vous ne connaissez pas la date exacte, vous pouvez indiquer une date approximative.",
-            )
-            QuestionField(
-                value = state.birthDigits, onValueChange = actions.onBirthDate, a11yLabel = "Date de naissance",
-                placeholder = "JJ / MM / AAAA", keyboard = KeyboardOptions(keyboardType = KeyboardType.Number),
-                transformation = BirthDateTransformation,
-            )
-        }
-        AddDogStep.Sex -> Scrollable {
-            PwQuestion("$dog est…")
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                SexCard("Femelle", PwIcons.Female, state.sex == Sex.Female, Modifier.weight(1f)) { actions.onSex(Sex.Female) }
-                SexCard("Mâle", PwIcons.Male, state.sex == Sex.Male, Modifier.weight(1f)) { actions.onSex(Sex.Male) }
+    StepColumn {
+        when (state.step) {
+            AddDogStep.Photo -> {
+                PwQuestion("Ajoutez une photo de votre chien")
+                PhotoStep(state, actions)
+            }
+            AddDogStep.Name -> {
+                PwQuestion("Comment s’appelle votre chien ?")
+                PwFlowTextField(
+                    value = state.name, onValueChange = actions.onName, label = "Nom du chien", placeholder = "Ex. Nala",
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, autoCorrectEnabled = false),
+                )
+            }
+            AddDogStep.BirthDate -> {
+                // Texte de la maquette (« né » quel que soit le sexe, choisi à l'étape suivante), comme iOS.
+                PwQuestion(
+                    "Quand est né $dog ?",
+                    "Si vous ne connaissez pas la date exacte, vous pouvez indiquer une date approximative.",
+                )
+                val invalid = state.birthDigits.length == 8 && parseBirthDate(state.birthDigits) == BirthDate.Invalid
+                FieldWithError(if (invalid) AddDogMessages.BIRTH_INVALID else null) {
+                    PwFlowTextField(
+                        value = state.birthDigits, onValueChange = actions.onBirthDate, label = "Date de naissance",
+                        placeholder = "JJ / MM / AAAA", invalid = invalid,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        visualTransformation = BirthDateTransformation,
+                    )
+                }
+            }
+            AddDogStep.Sex -> {
+                PwQuestion("$dog est…")
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SexCard("Femelle", "♀", state.sex == Sex.Female, Modifier.weight(1f)) { actions.onSex(Sex.Female) }
+                    SexCard("Mâle", "♂", state.sex == Sex.Male, Modifier.weight(1f)) { actions.onSex(Sex.Male) }
+                }
+            }
+            AddDogStep.Breed -> {
+                PwQuestion("Quelle est la race de $dog ?")
+                BreedStep(state, actions)
+            }
+            AddDogStep.Weight -> {
+                PwQuestion("Combien pèse $dog ?", "Un poids approximatif suffit.")
+                val invalid = parseWeight(state.weight) == Measurement.Invalid
+                FieldWithError(if (invalid) AddDogMessages.WEIGHT_INVALID else null) {
+                    UnitField(state.weight, actions.onWeight, "kg", "Poids en kilogrammes", invalid)
+                }
+            }
+            AddDogStep.Height -> {
+                PwQuestion("Quelle est la taille de $dog ?", "Au garrot, en centimètres. Une mesure approximative est acceptée.")
+                val invalid = parseHeight(state.height) == Measurement.Invalid
+                FieldWithError(if (invalid) AddDogMessages.HEIGHT_INVALID else null) {
+                    UnitField(state.height, actions.onHeight, "cm", "Taille en centimètres", invalid)
+                }
+            }
+            AddDogStep.Medical -> {
+                PwQuestion(
+                    "Y a-t-il quelque chose d’important à savoir sur la santé de $dog ?",
+                    "Optionnel — conditions connues, traitements, allergies, antécédents… Ces informations pourront aider votre vétérinaire plus tard.",
+                )
+                PwFlowTextField(
+                    value = state.medical, onValueChange = actions.onMedical, label = "Infos santé",
+                    placeholder = "Écrire ici (facultatif)…", singleLine = false, minHeight = 174.dp,
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                )
+            }
+            AddDogStep.Summary -> {
+                PwQuestion("Le profil de $dog", "Vérifiez les informations avant de continuer.")
+                Summary(state, actions.onEdit)
             }
         }
-        AddDogStep.Breed -> BreedStep(state, actions)
-        AddDogStep.Weight -> Scrollable {
-            PwQuestion("Combien pèse $dog ?", "Un poids approximatif suffit.")
-            UnitField(state.weight, actions.onWeight, "kg", "Poids en kilogrammes")
-        }
-        AddDogStep.Height -> Scrollable {
-            PwQuestion("Quelle est la taille de $dog ?", "Au garrot, en centimètres. Une mesure approximative est acceptée.")
-            UnitField(state.height, actions.onHeight, "cm", "Taille en centimètres")
-        }
-        AddDogStep.Medical -> Scrollable {
-            PwQuestion(
-                "Y a-t-il quelque chose d'important à savoir sur la santé de $dog ?",
-                "Optionnel — conditions connues, traitements, allergies, antécédents… Ces informations pourront aider votre vétérinaire plus tard.",
-            )
-            QuestionField(
-                value = state.medical, onValueChange = actions.onMedical, a11yLabel = "Infos santé",
-                placeholder = "Écrire ici (facultatif)…", singleLine = false, minLines = 6,
-                keyboard = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
-            )
-        }
-        AddDogStep.Summary -> Scrollable { Summary(state, actions.onEdit) }
     }
 }
 
 @Composable
-private fun Scrollable(content: @Composable () -> Unit) {
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) { content() }
-}
-
-@Composable
-private fun QuestionField(
-    value: String,
-    onValueChange: (String) -> Unit,
-    a11yLabel: String,
-    placeholder: String,
-    keyboard: KeyboardOptions = KeyboardOptions.Default,
-    transformation: VisualTransformation = VisualTransformation.None,
-    singleLine: Boolean = true,
-    minLines: Int = 1,
-) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = onValueChange,
-        placeholder = { Text(placeholder) },
-        singleLine = singleLine,
-        minLines = minLines,
-        keyboardOptions = keyboard,
-        visualTransformation = transformation,
-        shape = PwRadius.Control,
-        textStyle = MaterialTheme.typography.bodyLarge.copy(fontSize = 17.sp),
-        colors = fieldColors(),
-        modifier = Modifier.fillMaxWidth().semantics { contentDescription = a11yLabel },
+private fun StepColumn(content: @Composable ColumnScope.() -> Unit) {
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+            .padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(24.dp),
+        content = content,
     )
 }
 
+/** Champ + message d'erreur (Inter 600 12, #B4233A) à 8 dp dessous. */
 @Composable
-private fun fieldColors() = OutlinedTextFieldDefaults.colors(
-    focusedContainerColor = PwColors.SurfaceCard,
-    unfocusedContainerColor = PwColors.SurfaceCard,
-    unfocusedBorderColor = PwColors.BorderStrong,
-    focusedBorderColor = PwColors.Action,
-)
+private fun FieldWithError(error: String?, field: @Composable () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        field()
+        if (error != null) PwFieldError(error)
+    }
+}
 
-/** Poids / taille : grand chiffre + unité (maquette `UnitInput`). */
+/**
+ * Poids / taille (maquette A13 / A14) : valeur à gauche, unité à 221,5 dp du bord du champ, Inter 17.
+ */
 @Composable
-private fun UnitField(value: String, onValueChange: (String) -> Unit, unit: String, a11yLabel: String) {
-    OutlinedTextField(
+private fun UnitField(value: String, onValueChange: (String) -> Unit, unit: String, label: String, invalid: Boolean) {
+    PwFlowTextField(
         value = value,
         onValueChange = onValueChange,
-        placeholder = { Text("0", style = MaterialTheme.typography.headlineMedium) },
-        singleLine = true,
+        label = label,
+        placeholder = "—",
+        invalid = invalid,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-        trailingIcon = { Text(unit, style = MaterialTheme.typography.titleMedium, color = PwColors.TextMuted, modifier = Modifier.padding(end = 12.dp)) },
-        textStyle = MaterialTheme.typography.headlineMedium,
-        shape = PwRadius.Control,
-        colors = fieldColors(),
-        modifier = Modifier.fillMaxWidth().semantics { contentDescription = a11yLabel },
+        fieldWidth = UNIT_OFFSET,
+        trailing = {
+            Text(unit, style = PwText.FlowField, color = PwColors.TextPrimary, modifier = Modifier.clearAndSetSemantics {})
+        },
     )
 }
 
+/** Position de l'unité : 221,5 dp du bord du champ, moins la marge intérieure de 16. */
+private val UNIT_OFFSET = 205.5.dp
+
+/**
+ * Maquette A08 : photo ronde 160, bouton « + » 44 en bas à droite, « ou choisissez un exemple » (Inter 12,5),
+ * 4 vignettes 64 × 64 rayon 16 écartées de 12, sélection bordée de #0A5C78 (2 dp) ; écarts 20.
+ */
 @Composable
 private fun PhotoStep(state: AddDogUiState, actions: AddDogActions) {
-    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(Modifier.size(160.dp)) {
-            val chosen = state.photo != PhotoChoice.None
-            Box(
-                Modifier.fillMaxSize().clip(CircleShape)
-                    .border(2.dp, if (chosen) PwColors.Action else PwColors.BorderStrong, CircleShape)
-                    .clickable(onClickLabel = "Choisir une photo dans la galerie", onClick = actions.onPickPhoto),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (chosen) {
-                    PetPhoto(state.photo, contentDescription = "Aperçu de la photo", modifier = Modifier.fillMaxSize())
-                } else {
-                    Icon(PwIcons.Paw, contentDescription = "Ajouter une photo", tint = PwColors.TextMuted, modifier = Modifier.size(44.dp))
-                }
+    Column(
+        Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(20.dp),
+    ) {
+        val chosen = state.photo != PhotoChoice.None
+        Box(
+            Modifier.size(160.dp).clickable(
+                role = Role.Button,
+                onClickLabel = if (chosen) "Changer la photo" else "Ajouter une photo depuis la galerie",
+                onClick = actions.onPickPhoto,
+            ),
+        ) {
+            if (chosen) {
+                PetPhoto(state.photo, contentDescription = "Aperçu de la photo", modifier = Modifier.fillMaxSize().clip(CircleShape))
+            } else {
+                Box(
+                    Modifier.fillMaxSize().background(PwColors.AvatarBackdrop, CircleShape).semantics { contentDescription = "Ajouter une photo" },
+                    contentAlignment = Alignment.Center,
+                ) { Icon(PwIcons.Paw, contentDescription = null, tint = PwColors.Action.copy(alpha = 0.5f), modifier = Modifier.size(56.dp)) }
             }
-            Surface(
-                shape = CircleShape, color = PwColors.Action, contentColor = PwColors.ActionText,
-                modifier = Modifier.align(Alignment.BottomEnd).size(44.dp),
-            ) { Box(contentAlignment = Alignment.Center) { Icon(PwIcons.Plus, null, Modifier.size(22.dp)) } }
+            PhotoPlusBadge(Modifier.align(Alignment.BottomEnd).offset((-1).dp, (-1).dp))
         }
-        state.photoError?.let { PwFieldError(it, Modifier.padding(top = 8.dp)) }
-        Spacer(Modifier.height(20.dp))
-        Text("ou choisissez un exemple", style = MaterialTheme.typography.bodySmall, color = PwColors.TextMuted)
-        Spacer(Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        state.photoError?.let { PwFieldError(it) }
+        Text("ou choisissez un exemple", style = PwText.inter(12.5f), color = PwColors.TextMuted)
+        // Cadre Figma de 296 dp, vignettes calées à gauche (292 dp) : même position que la maquette.
+        Row(Modifier.width(296.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             SamplePhoto.entries.forEachIndexed { index, sample ->
                 val selected = (state.photo as? PhotoChoice.Sample)?.sample == sample
+                val shape = RoundedCornerShape(16.dp)
                 PetPhoto(
                     PhotoChoice.Sample(sample),
                     contentDescription = "Exemple de photo ${index + 1}",
-                    modifier = Modifier.size(64.dp).clip(PwRadius.Control)
-                        .border(2.dp, if (selected) PwColors.Action else PwColors.SurfacePage, PwRadius.Control)
+                    modifier = Modifier.size(64.dp).clip(shape)
+                        .then(if (selected) Modifier.border(2.dp, PwColors.Action, shape) else Modifier)
                         .semantics { this.selected = selected }
                         .clickable(role = Role.RadioButton) { actions.onSample(sample) },
                 )
@@ -211,82 +222,85 @@ private fun PhotoStep(state: AddDogUiState, actions: AddDogActions) {
     }
 }
 
+/** Bouton « + » de la maquette : disque 44 #0A5C78, croix blanche 16 dp, trait 2,6, bouts ronds. */
 @Composable
-private fun SexCard(label: String, icon: ImageVector, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
-    Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(24.dp),
-        color = if (selected) PwColors.Action.copy(alpha = 0.1f) else PwColors.SurfaceCard,
-        contentColor = if (selected) PwColors.Action else PwColors.TextPrimary,
-        border = BorderStroke(1.dp, if (selected) PwColors.Action else PwColors.BorderStrong),
-        modifier = modifier.semantics { this.selected = selected },
-    ) {
-        Column(Modifier.padding(vertical = 32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(icon, contentDescription = null, modifier = Modifier.size(32.dp))
-            Spacer(Modifier.height(8.dp))
-            Text(label, style = MaterialTheme.typography.titleMedium)
-        }
+private fun PhotoPlusBadge(modifier: Modifier) {
+    Canvas(modifier.size(44.dp)) {
+        drawCircle(PwColors.Action)
+        val c = center
+        val half = 8.dp.toPx()
+        val w = 2.6.dp.toPx()
+        drawLine(PwColors.ActionText, Offset(c.x, c.y - half), Offset(c.x, c.y + half), w, StrokeCap.Round)
+        drawLine(PwColors.ActionText, Offset(c.x - half, c.y), Offset(c.x + half, c.y), w, StrokeCap.Round)
     }
 }
 
+/**
+ * Maquette A11 : carte 132 dp rayon 24, symbole Noto Sans Symbols 36 (boîte 49), libellé Inter 600 15, écart 12 ;
+ * choisie : fond #E5F1F7, bordure #0A5C78.
+ */
+@Composable
+private fun SexCard(label: String, symbol: String, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(24.dp)
+    Column(
+        modifier.heightIn(min = 132.dp)
+            .background(if (selected) PwColors.SurfaceElevated else PwColors.SurfaceCard, shape)
+            .border(1.dp, if (selected) PwColors.Action else PwColors.BorderStrong, shape)
+            .clip(shape)
+            .semantics { this.selected = selected }
+            .clickable(role = Role.RadioButton, onClick = onClick),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
+    ) {
+        Text(
+            symbol,
+            style = PwText.symbols(36f),
+            color = PwColors.TextPrimary,
+            modifier = Modifier.height(49.dp).offset(y = SYMBOL_OFFSET).clearAndSetSemantics {},
+        )
+        Text(label, style = PwText.inter(15f, FontWeight.SemiBold), color = PwColors.TextPrimary)
+    }
+}
+
+/** Figma place l'encre du symbole un peu plus haut dans sa boîte de 49 dp. */
+private val SYMBOL_OFFSET = (-3).dp
+
+/** Maquette A12 : champ de recherche puis suggestions (même cadre ; choisie : fond #E5F1F7, bordure #0A5C78). */
 @Composable
 private fun BreedStep(state: AddDogUiState, actions: AddDogActions) {
-    Column(Modifier.fillMaxSize()) {
-        PwQuestion("Quelle est la race de ${state.dogName} ?")
-        OutlinedTextField(
-            value = state.breedQuery,
-            onValueChange = actions.onBreedQuery,
-            placeholder = { Text("Rechercher une race…") },
-            leadingIcon = { Icon(PwIcons.Search, null, Modifier.size(18.dp)) },
-            singleLine = true,
-            shape = PwRadius.Control,
-            colors = fieldColors(),
-            modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Rechercher une race" },
-        )
-        Spacer(Modifier.height(12.dp))
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.weight(1f)) {
-            item {
-                BreedRow("Je ne sais pas", state.breed == BreedChoice.Unknown) { actions.onBreed(BreedChoice.Unknown) }
-            }
-            items(state.breeds, key = { it.code }) { breed ->
-                BreedRow(breed.name, (state.breed as? BreedChoice.Known)?.breed?.code == breed.code) {
-                    actions.onBreed(BreedChoice.Known(breed))
-                }
-            }
-            item {
-                when {
-                    state.breedsLoading -> Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.5.dp)
-                    }
-                    state.breedsFailed -> Column(Modifier.fillMaxWidth().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        PwFieldError(AddDogMessages.BREEDS_FAILED)
-                        TextButton(onClick = actions.onRetryBreeds) { Text("Réessayer") }
-                    }
-                    state.breeds.isEmpty() && state.breedQuery.isNotBlank() -> Text(
-                        "Aucune race trouvée.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = PwColors.TextMuted,
-                        modifier = Modifier.fillMaxWidth().padding(24.dp),
-                    )
-                }
-            }
+    PwFlowTextField(
+        value = state.breedQuery,
+        onValueChange = actions.onBreedQuery,
+        label = "Rechercher une race",
+        placeholder = "Rechercher une race",
+        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, autoCorrectEnabled = false),
+    )
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        state.breeds.forEach { breed ->
+            val selected = (state.breed as? BreedChoice.Known)?.breed?.code == breed.code
+            Box(
+                Modifier.fillMaxWidth().pwFieldBox(selected = selected).clip(RoundedCornerShape(16.dp))
+                    .semantics { this.selected = selected }
+                    .clickable(role = Role.RadioButton) { actions.onBreed(BreedChoice.Known(breed)) }
+                    .padding(horizontal = 16.dp),
+                contentAlignment = Alignment.CenterStart,
+            ) { Text(breed.name, style = PwText.FlowField, color = PwColors.TextPrimary) }
         }
-    }
-}
-
-@Composable
-private fun BreedRow(label: String, selected: Boolean, onClick: () -> Unit) {
-    Surface(
-        onClick = onClick,
-        shape = PwRadius.Control,
-        color = if (selected) PwColors.Action.copy(alpha = 0.1f) else PwColors.SurfaceCard,
-        contentColor = if (selected) PwColors.Action else PwColors.TextPrimary,
-        border = BorderStroke(1.dp, if (selected) PwColors.Action else PwColors.BorderStrong),
-        modifier = Modifier.fillMaxWidth().semantics { this.selected = selected },
-    ) {
-        Row(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-            if (selected) Icon(PwIcons.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+        when {
+            state.breedsLoading && state.breeds.isEmpty() -> Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.5.dp, color = PwColors.Action)
+            }
+            state.breedsFailed -> Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                PwFieldError(AddDogMessages.BREEDS_FAILED)
+                TextButton(onClick = actions.onRetryBreeds) {
+                    Text("Réessayer", style = PwText.inter(14f, FontWeight.SemiBold), color = PwColors.Action)
+                }
+            }
+            !state.breedsLoading && state.breeds.isEmpty() && state.breedQuery.isNotBlank() -> Text(
+                "Aucune race trouvée.",
+                style = PwText.Hint,
+                color = PwColors.TextMuted,
+            )
         }
     }
 }
@@ -297,44 +311,54 @@ private val DATE_FR = DateTimeFormatter.ofPattern("d MMMM yyyy", Locale.FRENCH)
 internal fun Double.toFrench(): String =
     if (this % 1.0 == 0.0) toLong().toString() else toString().replace('.', ',')
 
+/**
+ * Maquette A16 : photo 96 rayon 16, nom Bricolage 24 (écart 8) ; carte rayon 24 bordure #C1D4E0,
+ * 6 lignes de 51 dp (libellé Inter 13 sur 124 dp, valeur Inter 14, chevron 16 à 5 dp du bord), écarts 12.
+ */
 @Composable
 private fun Summary(state: AddDogUiState, onEdit: (AddDogStep) -> Unit) {
-    PwQuestion("Le profil de ${state.dogName}", "Vérifiez les informations avant de continuer.")
-    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        PetPhoto(state.photo, "Photo de ${state.dogName}", Modifier.size(96.dp).clip(RoundedCornerShape(24.dp)))
-        Spacer(Modifier.height(12.dp))
-        Text(state.dogName, style = MaterialTheme.typography.headlineSmall)
+    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        PetPhoto(state.photo, "Photo de ${state.dogName}", Modifier.size(96.dp).clip(RoundedCornerShape(16.dp)))
+        Text(state.dogName, style = PwText.display(24f), color = PwColors.TextPrimary)
     }
-    Spacer(Modifier.height(20.dp))
-    val birth = (parseBirthDate(state.birthDigits) as? BirthDate.Valid)?.date?.format(DATE_FR) ?: "—"
+    val birth = (parseBirthDate(state.birthDigits) as? BirthDate.Valid)?.date?.format(DATE_FR) ?: "Non renseignée"
     val rows = listOf(
         Triple("Date de naissance", birth, AddDogStep.BirthDate),
-        Triple("Sexe", when (state.sex) { Sex.Female -> "Femelle"; Sex.Male -> "Mâle"; else -> "—" }, AddDogStep.Sex),
+        Triple("Sexe", when (state.sex) { Sex.Female -> "Femelle"; Sex.Male -> "Mâle"; else -> "Non renseigné" }, AddDogStep.Sex),
         Triple(
             "Race",
-            when (val b = state.breed) { is BreedChoice.Known -> b.breed.name; BreedChoice.Unknown -> "Je ne sais pas"; null -> "—" },
+            when (val b = state.breed) { is BreedChoice.Known -> b.breed.name; else -> "Non renseignée" },
             AddDogStep.Breed,
         ),
-        Triple("Poids", (parseMeasurement(state.weight) as? Measurement.Valid)?.let { "${it.value.toFrench()} kg" } ?: "—", AddDogStep.Weight),
-        Triple("Taille", (parseMeasurement(state.height) as? Measurement.Valid)?.let { "${it.value.toFrench()} cm" } ?: "—", AddDogStep.Height),
+        Triple("Poids", (parseWeight(state.weight) as? Measurement.Valid)?.let { "${it.value.toFrench()} kg" } ?: "Non renseigné", AddDogStep.Weight),
+        Triple("Taille", (parseHeight(state.height) as? Measurement.Valid)?.let { "${it.value.toFrench()} cm" } ?: "Non renseignée", AddDogStep.Height),
         Triple("Infos santé", state.medical.trim().ifEmpty { "Aucune" }, AddDogStep.Medical),
     )
-    Surface(shape = PwRadius.Card, color = PwColors.SurfaceCard, border = BorderStroke(1.dp, PwColors.BorderStrong)) {
-        Column {
-            rows.forEachIndexed { i, (label, value, step) ->
-                if (i > 0) HorizontalDivider(color = PwColors.Border)
-                Row(
-                    Modifier.fillMaxWidth().heightIn(min = 48.dp)
-                        .clickable(onClickLabel = "Modifier $label") { onEdit(step) }
-                        .padding(horizontal = 16.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(label, style = MaterialTheme.typography.bodySmall, color = PwColors.TextMuted, modifier = Modifier.width(128.dp))
-                    Text(value, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                    Icon(PwIcons.ChevronRight, contentDescription = null, tint = PwColors.TextMuted, modifier = Modifier.size(16.dp))
-                }
+    val card = RoundedCornerShape(24.dp)
+    Column(
+        Modifier.fillMaxWidth().background(PwColors.SurfaceCard, card).border(1.dp, PwColors.BorderStrong, card)
+            .clip(card).padding(1.dp),
+    ) {
+        rows.forEach { (label, value, step) ->
+            Row(
+                Modifier.fillMaxWidth().heightIn(min = 51.dp)
+                    .clickable(onClickLabel = "Modifier $label") { onEdit(step) }
+                    .padding(start = 16.dp, end = 5.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(label, style = PwText.inter(13f), color = PwColors.TextMuted, modifier = Modifier.width(124.dp))
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    value,
+                    style = PwText.inter(14f),
+                    color = PwColors.TextPrimary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                Spacer(Modifier.width(12.dp))
+                Icon(PwIcons.ChevronRight, contentDescription = null, tint = PwColors.TextMuted, modifier = Modifier.size(16.dp))
             }
         }
     }
-    Spacer(Modifier.height(16.dp))
 }
