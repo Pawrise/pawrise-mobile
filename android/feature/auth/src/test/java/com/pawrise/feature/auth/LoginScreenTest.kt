@@ -3,7 +3,9 @@ package com.pawrise.feature.auth
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performImeAction
@@ -101,6 +103,29 @@ class LoginScreenTest {
         assertEquals(0, repository.loginCalls.size)
         compose.field("Mot de passe").performTextInput("chien-oslo-2026")
         compose.onNodeWithText("Se connecter").assertIsEnabled()
+    }
+
+    @Test
+    fun `e-mail invalide garde le bouton inactif`() {
+        compose.field("E-mail").performTextInput("camille.martin@example")
+        compose.field("Mot de passe").performTextInput("chien-oslo-2026")
+        compose.onNodeWithText("Se connecter").assertIsNotEnabled().performClick()
+        compose.waitForIdle()
+        assertEquals(0, repository.loginCalls.size)
+
+        compose.field("E-mail").performTextInput(".com")
+        compose.onNodeWithText("Se connecter").assertIsEnabled()
+    }
+
+    @Test
+    fun `l'oeil affiche puis masque le mot de passe`() {
+        compose.field("Mot de passe").performTextInput("chien-oslo-2026")
+        compose.field("Mot de passe").assertTextEquals("•".repeat(15), includeEditableText = true)
+
+        compose.onNodeWithContentDescription("Afficher le mot de passe").performClick()
+        compose.field("Mot de passe").assertTextEquals("chien-oslo-2026", includeEditableText = true)
+        compose.onNodeWithContentDescription("Masquer le mot de passe").performClick()
+        compose.field("Mot de passe").assertTextEquals("•".repeat(15), includeEditableText = true)
     }
 
     @Test

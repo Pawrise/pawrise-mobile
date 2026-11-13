@@ -34,6 +34,7 @@ dependencies {
     implementation(libs.androidx.hilt.lifecycle.viewmodel.compose)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.coil.compose) // photo du chien
+    implementation(libs.coil.network.okhttp) // photo du chien servie par l'API (http/https)
     debugImplementation(libs.compose.ui.tooling)
 
 
@@ -44,6 +45,7 @@ dependencies {
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(project(":core:testing"))
     testImplementation(libs.robolectric)
+    testImplementation(libs.okhttp.mockwebserver) // photo du chien servie par un faux serveur
     testImplementation(libs.androidx.test.core)
     testImplementation(platform(libs.compose.bom))
     testImplementation(libs.compose.ui.test.junit4)

@@ -42,6 +42,10 @@ object PwIcons {
     val Mail = lucide("Mail", LucidePaths.Mail)
     val Smartphone = lucide("Smartphone", LucidePaths.Smartphone)
 
+    /** Œil du champ mot de passe : afficher (« eye ») / masquer (« eye-off »). */
+    val Eye = lucide("Eye", LucidePaths.Eye)
+    val EyeOff = lucide("EyeOff", LucidePaths.EyeOff)
+
     /** Patte (Lucide « paw-print ») : Découverte, avatar sans photo, Chat IA. */
     val Paw = lucide("Paw", LucidePaths.Paw)
 

@@ -102,6 +102,7 @@ fun ChatRoute(
     }
     val conversation = remember(dog.id) { viewModel.conversation(dog.id) }
     val state by conversation.state.collectAsStateWithLifecycle()
+    val ownerFirstName by viewModel.ownerFirstName.collectAsStateWithLifecycle()
     LaunchedEffect(pendingQuestion, dog.id) {
         if (pendingQuestion != null) {
             conversation.send(pendingQuestion)
@@ -112,6 +113,7 @@ fun ChatRoute(
     DisposableEffect(dog.id) { onDispose { viewModel.cancelAll() } }
     ChatScreen(
         pet = dog,
+        ownerFirstName = ownerFirstName,
         state = state,
         onSend = conversation::send,
         onRetry = conversation::retry,
@@ -128,6 +130,7 @@ fun ChatScreen(
     onRetry: () -> Unit,
     onContactVet: () -> Unit,
     onShowIndicators: () -> Unit,
+    ownerFirstName: String? = null,
 ) {
     var draft by rememberSaveable(pet.id) { mutableStateOf("") }
     val focusManager = LocalFocusManager.current
@@ -147,7 +150,7 @@ fun ChatScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             AssistantRow {
-                AssistantBubble("Bonjour 👋 Je suis Pawrise, l'assistant de ${pet.name}. Que souhaitez-vous consulter ?")
+                AssistantBubble(chatGreeting(ownerFirstName, pet.name))
             }
             if (state.showsQuickReplies) {
                 Column(Modifier.padding(start = ChatLayout.avatarSize + ChatLayout.avatarSpacing), verticalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -21,8 +21,8 @@ data class LoginUiState(
     val error: String? = null,
     val loggedIn: Boolean = false,
 ) {
-    /** Comme iOS : bouton actif dès que les deux champs sont remplis. */
-    val canSubmit: Boolean get() = email.isNotBlank() && password.isNotEmpty() && !loading
+    /** Bouton actif seulement avec un e-mail valide et un mot de passe saisi. */
+    val canSubmit: Boolean get() = CredentialRules.isValidEmail(email) && password.isNotEmpty() && !loading
 }
 
 /** US-J · 02 Connexion (`POST /v1/auth/login`). */

@@ -2,6 +2,7 @@ package com.pawrise.feature.chat
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.pawrise.core.auth.AuthRepository
 import com.pawrise.feature.chat.assistant.AssistantConfig
 import com.pawrise.feature.chat.assistant.AssistantEvent
 import com.pawrise.feature.chat.assistant.AssistantException
@@ -17,7 +18,10 @@ import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -148,13 +152,28 @@ class ChatConversation(
     }
 }
 
+/**
+ * Message d'accueil du Chat IA : salue le propriétaire par son prénom quand il est connu
+ * (« Bonjour Alex 👋 Je suis Pawrise, l'assistant de Nala. … »), sinon la phrase de la maquette.
+ */
+fun chatGreeting(ownerFirstName: String?, petName: String): String {
+    val hello = ownerFirstName?.trim()?.takeIf { it.isNotEmpty() }?.let { "Bonjour $it" } ?: "Bonjour"
+    return "$hello 👋 Je suis Pawrise, l'assistant de $petName. Que souhaitez-vous consulter ?"
+}
+
 /** Conversations de la session, une par chien, conservées quand on change d'onglet. */
 @HiltViewModel
 class ChatViewModel @Inject constructor(
     private val service: AssistantService,
     private val config: AssistantConfig,
+    authRepository: AuthRepository,
 ) : ViewModel() {
     private val conversations = mutableMapOf<String, ChatConversation>()
+
+    /** Prénom du compte connecté, pour le message d'accueil ; `null` s'il est inconnu. */
+    val ownerFirstName: StateFlow<String?> = authRepository.user
+        .map { it?.firstName?.trim()?.takeIf(String::isNotEmpty) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, authRepository.user.value?.firstName?.trim()?.takeIf(String::isNotEmpty))
 
     fun conversation(petId: String): ChatConversation =
         conversations.getOrPut(petId) { ChatConversation(config.petRef(petId), service, viewModelScope) }

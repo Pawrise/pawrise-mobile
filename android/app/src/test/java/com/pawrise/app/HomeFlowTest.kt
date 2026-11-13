@@ -86,7 +86,7 @@ class HomeFlowTest {
     @Test
     fun `chat IA, suggestions, envoi désactivé, liens`() {
         compose.onNodeWithContentDescription("Chat IA").performClick()
-        compose.onNodeWithText("Bonjour 👋 Je suis Pawrise, l'assistant de Nala. Que souhaitez-​vous consulter ?").assertIsDisplayed()
+        compose.onNodeWithText("Bonjour Camille 👋 Je suis Pawrise, l'assistant de Nala. Que souhaitez-​vous consulter ?").assertIsDisplayed()
         compose.onNodeWithContentDescription("Envoyer").assertIsNotEnabled()
         compose.onNodeWithText("Et son sommeil ?").performClick()
         compose.onNodeWithText("Nala — 11 h de sommeil.").assertIsDisplayed()
