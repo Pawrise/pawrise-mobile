@@ -153,6 +153,17 @@ struct AuthContractTests {
         #expect(json.contains(#""phoneNumber":"+33612345678""#))
     }
 
+    @Test func encodesPreferencesPatchWithOnlyChangedField() throws {
+        let json = try JSONSerialization.jsonObject(with: APIClient.encoder.encode(PreferencesUpdate(healthNotifications: false))) as? [String: Any]
+        #expect(json?.count == 1)
+        #expect(json?["healthNotifications"] as? Bool == false)
+    }
+
+    @Test func explainsChiefTransferOnAccountDeletion() {
+        #expect(APIError.problem(409, "CHIEF_TRANSFER_REQUIRED").localizedDescription.contains("Transférez"))
+        #expect(DeleteAccountView.names(["Nala", "Oslo", "Rex"]) == "Nala, Oslo et Rex")
+    }
+
     @Test func mapsValidationErrorsToFieldMessages() throws {
         let json = #"{"status":400,"code":"VALIDATION_FAILED","title":"Validation failed","errors":[{"field":"password","code":"PASSWORD_BREACHED"},{"field":"email","code":"INVALID_EMAIL"}]}"#
         let problem = try APIClient.decoder.decode(ProblemDetails.self, from: Data(json.utf8))
@@ -232,6 +243,24 @@ struct MockAuthServiceTests {
         try await auth.resetPassword(ResetPasswordRequest(email: email, code: MockAuthService.resetCode, newPassword: "nouveau-chien-2026"))
         _ = try await auth.login(LoginRequest(email: email, password: "nouveau-chien-2026"))
         #expect(await code { _ = try await auth.login(LoginRequest(email: email, password: MockAuthService.demoPassword)) } == "INVALID_CREDENTIALS")
+    }
+
+    @Test func preferencesChangeOneFieldAtATime() async throws {
+        _ = try await register("alex@example.com")
+        #expect(try await auth.preferences() == .defaults)
+        let updated = try await auth.updatePreferences(PreferencesUpdate(anonymizedDataSharing: true))
+        #expect(updated == Preferences(deviceLocationSharing: true, healthNotifications: true, anonymizedDataSharing: true))
+        #expect(await code { _ = try await auth.updatePreferences(PreferencesUpdate()) } == "VALIDATION_FAILED")
+    }
+
+    @Test func deletedAccountIsGone() async throws {
+        let session = try await register("alex@example.com")
+        try await auth.deleteAccount()
+        #expect(await code { _ = try await auth.refresh(refreshToken: session.tokens.refreshToken) } == "INVALID_REFRESH_TOKEN")
+        #expect(await code {
+            _ = try await auth.login(LoginRequest(email: "alex@example.com", password: "un-mot-de-passe-solide"))
+        } == "INVALID_CREDENTIALS")
+        _ = try await register("alex@example.com") // l'adresse est de nouveau libre
     }
 }
 

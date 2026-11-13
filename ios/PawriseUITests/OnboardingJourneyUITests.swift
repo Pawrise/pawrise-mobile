@@ -2,20 +2,7 @@ import XCTest
 
 /// Parcours de bout en bout dans le simulateur (mode Debug : auth et collier simulés).
 /// Chaque étape clé est jointe en capture d'écran au rapport de test (.xcresult).
-@MainActor
-final class OnboardingJourneyUITests: XCTestCase {
-    private var app: XCUIApplication!
-
-    override func setUp() async throws {
-        continueAfterFailure = false
-        app = XCUIApplication()
-        app.launchArguments = ["-PawriseUITestReset"]
-        app.launch()
-        // Attendre la fin de la transition « lancement → accueil » avant de toucher quoi que ce soit.
-        XCTAssertTrue(app.staticTexts["Le collier connecté qui suit la santé et la position de votre chien."].waitForExistence(timeout: 10))
-        try await Task.sleep(for: .milliseconds(500))
-    }
-
+final class OnboardingJourneyUITests: PawriseUITestCase {
     /// Inscription → découverte → profil du chien → collier → Santé → détail d'un indicateur.
     func testSignupThroughCollarToHealthDashboard() {
         tap(button: "Créer un compte")
@@ -30,7 +17,7 @@ final class OnboardingJourneyUITests: XCTestCase {
 
         // Sans les CGU, l'inscription est refusée (RG11).
         tap(button: "Continuer")
-        XCTAssertTrue(app.staticTexts["Acceptez les conditions d'utilisation pour continuer."].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["Acceptez les conditions d’utilisation pour continuer."].waitForExistence(timeout: 3))
         app.descendants(matching: .any).matching(identifier: "terms-checkbox").firstMatch.tap()
         tap(button: "Continuer")
 
@@ -41,36 +28,7 @@ final class OnboardingJourneyUITests: XCTestCase {
         for _ in 0..<4 { tap(button: "Suivant") }
         tap(button: "Connecter le collier")
 
-        // Profil du chien (9 étapes)
-        XCTAssertTrue(app.staticTexts["Ajoutez une photo de votre chien"].waitForExistence(timeout: 5))
-        snapshot("03-profil-photo")
-        tap(button: "Suivant")
-        type(app.textFields.firstMatch, "Nala")
-        tap(button: "Suivant")
-        tap(button: "Suivant") // date de naissance facultative
-        tap(button: "Femelle")
-        tap(button: "Suivant")
-        type(app.textFields.firstMatch, "Golden")
-        tap(button: "Golden Retriever")
-        tap(button: "Suivant")
-        type(app.textFields.firstMatch, "28")
-        tap(button: "Suivant")
-        type(app.textFields.firstMatch, "55")
-        tap(button: "Suivant")
-        tap(button: "Suivant") // infos santé facultatives
-        XCTAssertTrue(app.staticTexts["Le profil de Nala"].waitForExistence(timeout: 5))
-        snapshot("04-profil-recapitulatif")
-        tap(button: "Continuer")
-
-        // Collier
-        XCTAssertTrue(app.staticTexts["Connectons le collier de Nala"].waitForExistence(timeout: 5))
-        snapshot("05-collier")
-        tap(button: "Saisir le code manuellement")
-        type(app.textFields.firstMatch, "PW-ABC123")
-        tap(button: "Activer le collier")
-        XCTAssertTrue(app.staticTexts["Le collier de Nala est activé"].waitForExistence(timeout: 10))
-        snapshot("06-collier-active")
-        tap(button: "Voir le tableau de bord de Nala")
+        createNalaWithCollar(snapshots: true)
 
         // Santé
         XCTAssertTrue(app.staticTexts["INDICATEURS"].waitForExistence(timeout: 5))
@@ -124,75 +82,54 @@ final class OnboardingJourneyUITests: XCTestCase {
         snapshot("10-chat-reponse")
     }
 
-    // MARK: Helpers
+    /// Paramètres → Confidentialité (un interrupteur) → Supprimer le compte → retour à l'accueil, compte inutilisable.
+    func testPrivacyToggleThenDeleteAccount() {
+        let email = "suppr.\(Int.random(in: 1000...9999))@example.com"
+        tap(button: "Créer un compte")
+        let fields = app.textFields
+        type(fields.element(boundBy: 0), "Alex")
+        type(fields.element(boundBy: 1), "Martin")
+        type(fields.element(boundBy: 2), email)
+        type(app.secureTextFields.element(boundBy: 0), "un-mot-de-passe-solide")
+        app.descendants(matching: .any).matching(identifier: "terms-checkbox").firstMatch.tap()
+        tap(button: "Continuer")
+        XCTAssertTrue(app.staticTexts["Pawrise veille sur votre chien"].waitForExistence(timeout: 8))
+        dismissSavePasswordPrompt(within: 3)
 
-    /// Fenêtres « mot de passe » d'iOS (mot de passe robuste, enregistrer dans le trousseau) : elles recouvrent l'app.
-    private var passwordSheetButtons: [XCUIElement] {
-        // Pas le bouton ✕ « Fermer » : l'app en a un aussi (profil du chien).
-        ["Plus tard", "Not Now", "Choisir mon propre mot de passe", "Choose My Own Password"].map { app.buttons[$0] }
-    }
+        // Les onglets n'apparaissent qu'une fois un chien ajouté.
+        for _ in 0..<4 { tap(button: "Suivant") }
+        tap(button: "Connecter le collier")
+        createNalaWithCollar(snapshots: false)
+        XCTAssertTrue(app.staticTexts["INDICATEURS"].waitForExistence(timeout: 5))
+        tap(button: "Paramètres")
 
-    /// Ferme une fenêtre « mot de passe » d'iOS si elle est affichée (sans attendre).
-    @discardableResult
-    private func dismissPasswordSheetIfShown() -> Bool {
-        for button in passwordSheetButtons where button.exists && button.isHittable {
-            button.tap()
-            return true
-        }
-        // « Utiliser un mot de passe robuste ? » : seul le ✕ de cette fenêtre la ferme.
-        let strongPasswordTitle = app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'mot de passe robuste' OR label CONTAINS 'Strong Password'")).firstMatch
-        let close = app.buttons.matching(NSPredicate(format: "identifier == 'xmark'")).firstMatch
-        if strongPasswordTitle.exists, close.exists, close.isHittable {
-            close.tap()
-            return true
-        }
-        return false
-    }
+        let anonymized = app.switches["privacy-anonymized-data"]
+        XCTAssertTrue(anonymized.waitForExistence(timeout: 8))
+        XCTAssertEqual(anonymized.value as? String, "0")
+        // Le libellé occupe toute la ligne : on touche l'interrupteur lui-même, à droite.
+        anonymized.coordinate(withNormalizedOffset: CGVector(dx: 0.93, dy: 0.5)).tap()
+        let enabled = NSPredicate(format: "value == '1' AND isEnabled == true")
+        expectation(for: enabled, evaluatedWith: anonymized)
+        waitForExpectations(timeout: 5)
+        snapshot("11-confidentialite")
 
-    /// Après une connexion ou une inscription, iOS peut proposer d'enregistrer le mot de passe un peu plus tard.
-    private func dismissSavePasswordPrompt(within seconds: TimeInterval = 4) {
-        let deadline = Date().addingTimeInterval(seconds)
-        while Date() < deadline {
-            if dismissPasswordSheetIfShown() { return }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.25))
-        }
-    }
+        let openDelete = app.buttons["open-delete-account"]
+        for _ in 0..<6 where !openDelete.isHittable { app.swipeUp() }
+        openDelete.tap()
+        XCTAssertTrue(app.staticTexts["Cette action est définitive"].waitForExistence(timeout: 5))
+        snapshot("12-supprimer-compte")
+        let deleteButton = app.buttons["delete-account-button"]
+        for _ in 0..<4 where !(deleteButton.exists && deleteButton.isHittable) { app.swipeUp() }
+        deleteButton.tap()
+        let confirm = app.buttons["Supprimer définitivement"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 3))
+        confirm.tap()
 
-    private func tap(button label: String, file: StaticString = #filePath, line: UInt = #line) {
-        dismissPasswordSheetIfShown()
-        let button = app.buttons[label].firstMatch
-        XCTAssertTrue(button.waitForExistence(timeout: 8), "Bouton introuvable : \(label)", file: file, line: line)
-        button.tap()
-    }
-
-    private func type(_ element: XCUIElement, _ text: String, file: StaticString = #filePath, line: UInt = #line) {
-        XCTAssertTrue(element.waitForExistence(timeout: 5), "Champ introuvable", file: file, line: line)
-        guard element.elementType == .secureTextField else {
-            element.tap()
-            element.typeText(text)
-            return
-        }
-        // Sur un champ « nouveau mot de passe », iOS peut ouvrir une fenêtre de suggestion qui prend la saisie :
-        // on la ferme et on vérifie que les caractères sont bien arrivés (affichés en points).
-        for _ in 0..<3 {
-            element.tap()
-            RunLoop.current.run(until: Date().addingTimeInterval(1))
-            if dismissPasswordSheetIfShown() {
-                RunLoop.current.run(until: Date().addingTimeInterval(0.5))
-                element.tap()
-            }
-            element.typeText(text)
-            if ((element.value as? String) ?? "").count == text.count { return }
-            let typed = ((element.value as? String) ?? "").count
-            element.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: typed))
-        }
-        XCTFail("Impossible de saisir le mot de passe", file: file, line: line)
-    }
-
-    private func snapshot(_ name: String) {
-        let attachment = XCTAttachment(screenshot: app.screenshot())
-        attachment.name = name
-        attachment.lifetime = .keepAlways
-        add(attachment)
+        XCTAssertTrue(app.staticTexts["Le collier connecté qui suit la santé et la position de votre chien."].waitForExistence(timeout: 10))
+        tap(button: "Se connecter")
+        type(app.textFields.firstMatch, email)
+        type(app.secureTextFields.firstMatch, "un-mot-de-passe-solide")
+        app.buttons.matching(NSPredicate(format: "label == 'Se connecter'")).firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["E-mail ou mot de passe incorrect."].waitForExistence(timeout: 8))
     }
 }
