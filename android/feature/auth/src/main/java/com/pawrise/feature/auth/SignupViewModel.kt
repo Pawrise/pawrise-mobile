@@ -34,8 +34,10 @@ data class SignupUiState(
     val phone: String = "",
     val password: String = "",
     val termsAccepted: Boolean = false,
-    /** Après un premier envoi : les erreurs locales s'affichent (et se mettent à jour à la saisie). */
+    /** Après une tentative d'envoi (touche « OK » du clavier) : toutes les erreurs locales s'affichent. */
     val showErrors: Boolean = false,
+    /** Champs quittés par l'utilisateur (ou case CGU touchée) : leur erreur locale s'affiche, et suit la saisie. */
+    val touched: Set<SignupField> = emptySet(),
     /** Erreurs par champ renvoyées par le serveur (VALIDATION_FAILED), affichées sous le champ. */
     val serverErrors: Map<SignupField, String> = emptyMap(),
     val formError: String? = null,
@@ -56,9 +58,15 @@ data class SignupUiState(
             if (!termsAccepted) put(SignupField.Terms, SignupMessages.TERMS)
         }
 
-    /** Erreur affichée sous chaque champ : locale après un envoi, sinon celle du serveur. */
+    /** « Continuer » actif seulement si tous les champs obligatoires sont remplis et valides. */
+    val canSubmit: Boolean get() = !loading && localErrors.isEmpty()
+
+    /**
+     * Erreur affichée sous chaque champ : celle du serveur, et l'erreur locale d'un champ déjà quitté
+     * (jamais avant que l'utilisateur l'ait touché), ou de tous les champs après une tentative d'envoi.
+     */
     val fieldErrors: Map<SignupField, String>
-        get() = if (showErrors) serverErrors + localErrors else serverErrors
+        get() = serverErrors + localErrors.filterKeys { showErrors || it in touched }
 }
 
 /** US-A · 02 Créer un compte (`POST /v1/auth/register`). */
@@ -71,9 +79,13 @@ class SignupViewModel @Inject constructor(private val authRepository: AuthReposi
     fun onFirstNameChange(value: String) = edit(SignupField.FirstName) { copy(firstName = value) }
     fun onLastNameChange(value: String) = edit(SignupField.LastName) { copy(lastName = value) }
     fun onEmailChange(value: String) = edit(SignupField.Email) { copy(email = value) }
-    fun onPhoneChange(value: String) = edit(SignupField.Phone) { copy(phone = value) }
+    /** Chiffres et « + » initial seulement : la mise en forme « 06 12 34 56 78 » est faite à l'affichage. */
+    fun onPhoneChange(value: String) = edit(SignupField.Phone) { copy(phone = PhoneNumbers.sanitize(value)) }
     fun onPasswordChange(value: String) = edit(SignupField.Password) { copy(password = value) }
-    fun onTermsChange(value: Boolean) = edit(SignupField.Terms) { copy(termsAccepted = value) }
+    fun onTermsChange(value: Boolean) = edit(SignupField.Terms) { copy(termsAccepted = value, touched = touched + SignupField.Terms) }
+
+    /** L'utilisateur a quitté le champ : son erreur locale éventuelle s'affiche désormais. */
+    fun onFieldLeft(field: SignupField) = _state.update { if (field in it.touched) it else it.copy(touched = it.touched + field) }
 
     fun submit() {
         val s = _state.value
@@ -82,7 +94,7 @@ class SignupViewModel @Inject constructor(private val authRepository: AuthReposi
         if (s.localErrors.isNotEmpty()) return
 
         _state.update { it.copy(loading = true) }
-        val phone = s.phone.trim().takeIf { it.isNotEmpty() }?.let { toE164(it) }
+        val phone = s.phone.takeIf { it.isNotEmpty() }?.let { toE164(it) }
         viewModelScope.launch {
             val form = RegistrationForm(s.firstName, s.lastName, CredentialRules.normalizedEmail(s.email), phone, s.password)
             when (val result = authRepository.register(form)) {

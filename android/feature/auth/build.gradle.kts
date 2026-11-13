@@ -31,6 +31,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.hilt.lifecycle.viewmodel.compose)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.libphonenumber) // téléphone : saisie, validation, E.164
     debugImplementation(libs.compose.ui.tooling)
 
     implementation(libs.hilt.android)

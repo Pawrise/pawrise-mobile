@@ -1,12 +1,19 @@
 package com.pawrise.feature.auth
 
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performImeAction
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import com.pawrise.core.auth.RegistrationForm
 import com.pawrise.core.designsystem.theme.PawriseTheme
 import com.pawrise.core.network.ErrorCodes
@@ -49,13 +56,25 @@ class SignupScreenTest {
 
     private fun see(text: String) = compose.onNodeWithText(text).performScrollTo().assertIsDisplayed()
 
+    private fun absent(text: String) = compose.onNodeWithText(text).assertDoesNotExist()
+
+    private fun continueButton() = compose.onNodeWithText("Continuer").performScrollTo()
+
+    /** Place le focus dans un champ (l'utilisateur quitte le champ précédent). */
+    private fun focus(label: String) {
+        compose.field(label).performScrollTo().performSemanticsAction(SemanticsActions.RequestFocus)
+        compose.waitForIdle()
+    }
+
+    private val terms = "J’accepte les conditions d’utilisation et la politique de confidentialité de Pawrise."
+
     private fun fillValid(phone: String = "06 12 34 56 78") {
         type("Prénom", " Camille ")
         type("Nom", "Martin")
         type("E-mail", "camille.martin@example.com")
         if (phone.isNotEmpty()) type("Téléphone", phone)
         type("Mot de passe", "chien-oslo-2026")
-        tap("J’accepte les conditions d’utilisation et la politique de confidentialité de Pawrise.")
+        tap(terms)
     }
 
     @Test
@@ -80,8 +99,38 @@ class SignupScreenTest {
     }
 
     @Test
-    fun `formulaire vide signale chaque champ sans appel au serveur`() {
-        tap("Continuer")
+    fun `formulaire vide - Continuer desactive et aucune erreur avant d'avoir touche un champ`() {
+        continueButton().assertIsNotEnabled().performClick()
+        compose.waitForIdle()
+
+        absent("Indiquez votre prénom.")
+        absent("Saisissez une adresse e-mail valide, par exemple alex@exemple.fr.")
+        absent("Acceptez les conditions d’utilisation pour continuer.")
+        assertTrue(repository.registerCalls.isEmpty())
+    }
+
+    @Test
+    fun `l'erreur d'un champ s'affiche quand on le quitte, et suit la correction`() {
+        type("E-mail", "camille")
+        absent("Saisissez une adresse e-mail valide, par exemple alex@exemple.fr.")
+
+        focus("Prénom")
+        see("Saisissez une adresse e-mail valide, par exemple alex@exemple.fr.")
+        absent("Indiquez votre prénom.") // champ en cours de saisie : pas encore d'erreur
+
+        focus("Nom")
+        see("Indiquez votre prénom.")
+
+        type("E-mail", ".martin@example.com")
+        absent("Saisissez une adresse e-mail valide, par exemple alex@exemple.fr.")
+        continueButton().assertIsNotEnabled()
+    }
+
+    @Test
+    fun `touche OK du clavier sur un formulaire vide signale chaque champ sans appel au serveur`() {
+        focus("Mot de passe")
+        compose.field("Mot de passe").performImeAction()
+        compose.waitForIdle()
 
         see("Indiquez votre prénom.")
         see("Indiquez votre nom.")
@@ -97,10 +146,13 @@ class SignupScreenTest {
         type("Nom", "Martin")
         type("E-mail", "camille.martin@example.com")
         type("Mot de passe", "chien12")
-        tap("J’accepte les conditions d’utilisation et la politique de confidentialité de Pawrise.")
-        tap("Continuer")
+        tap(terms)
 
+        continueButton().assertIsNotEnabled()
         see("Le mot de passe doit faire au moins 8 caractères.")
+        type("Mot de passe", "6")
+        continueButton().assertIsEnabled()
+        absent("Le mot de passe doit faire au moins 8 caractères.")
         assertTrue(repository.registerCalls.isEmpty())
     }
 
@@ -110,8 +162,12 @@ class SignupScreenTest {
         type("Nom", "Martin")
         type("E-mail", "camille.martin@example.com")
         type("Mot de passe", "chien-oslo-2026")
-        tap("Continuer")
+        continueButton().assertIsNotEnabled()
 
+        tap(terms)
+        continueButton().assertIsEnabled()
+        tap(terms)
+        continueButton().assertIsNotEnabled()
         see("Acceptez les conditions d’utilisation pour continuer.")
         assertTrue(repository.registerCalls.isEmpty())
     }
@@ -119,10 +175,40 @@ class SignupScreenTest {
     @Test
     fun `telephone invalide signale`() {
         fillValid(phone = "06 12")
-        tap("Continuer")
 
+        continueButton().assertIsNotEnabled()
         see("Saisissez un numéro valide, par exemple 06 12 34 56 78.")
         assertTrue(repository.registerCalls.isEmpty())
+    }
+
+    @Test
+    fun `telephone mis en forme pendant la saisie et envoye en E164`() {
+        type("Téléphone", "0612345678")
+        compose.field("Téléphone").assertTextEquals("06 12 34 56 78", includeEditableText = true)
+
+        compose.field("Téléphone").performTextReplacement("+32 2 512 34 56")
+        compose.field("Téléphone").assertTextEquals("+32 2 512 34 56", includeEditableText = true)
+        type("Prénom", "Camille")
+        type("Nom", "Martin")
+        type("E-mail", "camille.martin@example.com")
+        type("Mot de passe", "chien-oslo-2026")
+        tap(terms)
+        tap("Continuer")
+
+        assertEquals("+3225123456", repository.registerCalls.single().phoneNumber)
+    }
+
+    @Test
+    fun `l'oeil affiche puis masque le mot de passe`() {
+        type("Mot de passe", "chien-oslo-2026")
+        compose.field("Mot de passe").assertTextEquals("•".repeat(15), includeEditableText = true)
+
+        compose.onNodeWithContentDescription("Afficher le mot de passe").performScrollTo().performClick()
+        compose.field("Mot de passe").assertTextEquals("chien-oslo-2026", includeEditableText = true)
+
+        compose.onNodeWithContentDescription("Masquer le mot de passe").performClick()
+        compose.field("Mot de passe").assertTextEquals("•".repeat(15), includeEditableText = true)
+        compose.onNodeWithContentDescription("Afficher le mot de passe").assertExists()
     }
 
     @Test

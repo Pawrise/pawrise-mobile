@@ -43,6 +43,7 @@ dependencies {
     implementation(libs.androidx.hilt.lifecycle.viewmodel.compose)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.coil.compose) // photo du chien
+    implementation(libs.coil.network.okhttp) // photo du chien servie par l'API (http/https)
     debugImplementation(libs.compose.ui.tooling)
 
     implementation(libs.hilt.android)

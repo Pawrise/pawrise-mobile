@@ -20,7 +20,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -46,6 +45,7 @@ fun SignupRoute(
         onPhone = viewModel::onPhoneChange,
         onPassword = viewModel::onPasswordChange,
         onTerms = viewModel::onTermsChange,
+        onFieldLeft = viewModel::onFieldLeft,
         onSubmit = viewModel::submit,
         onBack = onBack,
         onLogin = onLogin,
@@ -62,6 +62,7 @@ internal fun SignupForm(
     onPhone: (String) -> Unit,
     onPassword: (String) -> Unit,
     onTerms: (Boolean) -> Unit,
+    onFieldLeft: (SignupField) -> Unit,
     onSubmit: () -> Unit,
     onBack: () -> Unit,
     onLogin: () -> Unit,
@@ -90,34 +91,39 @@ internal fun SignupForm(
                         label = "Prénom", value = state.firstName, onValueChange = onFirstName, placeholder = "Alex",
                         error = errors[SignupField.FirstName], textSize = 17f, borderColor = PwColors.BorderStrong,
                         enabled = enabled, keyboardOptions = names, modifier = Modifier.weight(1f),
+                        onFocusLost = { onFieldLeft(SignupField.FirstName) },
                     )
                     AuthField(
                         label = "Nom", value = state.lastName, onValueChange = onLastName, placeholder = "Martin",
                         error = errors[SignupField.LastName], textSize = 17f, borderColor = PwColors.BorderStrong,
                         enabled = enabled, keyboardOptions = names, modifier = Modifier.weight(1f),
+                        onFocusLost = { onFieldLeft(SignupField.LastName) },
                     )
                 }
                 AuthField(
                     label = "E-mail", value = state.email, onValueChange = onEmail, placeholder = "alex@exemple.fr",
                     error = errors[SignupField.Email], textSize = 17f, borderColor = PwColors.BorderStrong, enabled = enabled,
                     keyboardOptions = next.copy(keyboardType = KeyboardType.Email, autoCorrectEnabled = false),
+                    onFocusLost = { onFieldLeft(SignupField.Email) },
                 )
                 AuthField(
-                    label = "Téléphone", value = state.phone, onValueChange = onPhone,
+                    label = "Téléphone", value = state.phone, onValueChange = onPhone, placeholder = "06 12 34 56 78",
                     error = errors[SignupField.Phone], textSize = 17f, borderColor = PwColors.BorderStrong, enabled = enabled,
-                    keyboardOptions = next.copy(keyboardType = KeyboardType.Phone),
+                    keyboardOptions = next.copy(keyboardType = KeyboardType.Phone, autoCorrectEnabled = false),
+                    visualTransformation = PhoneVisualTransformation,
+                    onFocusLost = { onFieldLeft(SignupField.Phone) },
                 )
-                AuthField(
+                AuthPasswordField(
                     label = "Mot de passe", value = state.password, onValueChange = onPassword,
                     placeholder = "8 caractères minimum",
                     error = errors[SignupField.Password], textSize = 17f, borderColor = PwColors.BorderStrong, enabled = enabled,
-                    visualTransformation = PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Go),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
                     keyboardActions = KeyboardActions(onGo = { onSubmit() }),
+                    onFocusLost = { onFieldLeft(SignupField.Password) },
                 )
                 TermsCheckbox(state.termsAccepted, onTerms, enabled, errors[SignupField.Terms])
                 state.formError?.let { ErrorBanner(it) }
-                AuthPrimaryButton("Continuer", onClick = onSubmit, loading = state.loading)
+                AuthPrimaryButton("Continuer", onClick = onSubmit, enabled = state.canSubmit, loading = state.loading)
                 AuthLink("J’ai déjà un compte", onClick = onLogin, enabled = enabled, modifier = Modifier.fillMaxWidth())
             }
         }
@@ -130,7 +136,7 @@ private fun SignupFormPreview() {
     PawriseTheme {
         SignupForm(
             state = SignupUiState(firstName = "Alex", lastName = "Martin", email = "alex@example.com"),
-            onFirstName = {}, onLastName = {}, onEmail = {}, onPhone = {}, onPassword = {}, onTerms = {},
+            onFirstName = {}, onLastName = {}, onEmail = {}, onPhone = {}, onPassword = {}, onTerms = {}, onFieldLeft = {},
             onSubmit = {}, onBack = {}, onLogin = {},
         )
     }

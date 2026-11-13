@@ -26,12 +26,18 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -44,6 +50,8 @@ import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextAlign
@@ -118,7 +126,12 @@ internal fun AuthField(
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     keyboardActions: KeyboardActions = KeyboardActions.Default,
     visualTransformation: VisualTransformation = VisualTransformation.None,
+    /** Appelé quand le champ perd le focus (l'utilisateur l'a quitté) : ses erreurs peuvent alors s'afficher. */
+    onFocusLost: (() -> Unit)? = null,
+    /** Élément à droite de la saisie (œil du mot de passe). */
+    trailing: (@Composable () -> Unit)? = null,
 ) {
+    var focused by remember { mutableStateOf(false) }
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(label, style = pwText(12f, FontWeight.SemiBold, PwColors.TextMuted))
         BasicTextField(
@@ -132,7 +145,13 @@ internal fun AuthField(
             keyboardActions = keyboardActions,
             visualTransformation = visualTransformation,
             // Le libellé est affiché au-dessus du champ : on l'associe au champ pour TalkBack.
-            modifier = Modifier.fillMaxWidth().semantics { contentDescription = label },
+            modifier = Modifier
+                .fillMaxWidth()
+                .onFocusChanged {
+                    if (focused && !it.isFocused) onFocusLost?.invoke()
+                    focused = it.isFocused
+                }
+                .semantics { contentDescription = label },
             decorationBox = { inner ->
                 Box(
                     Modifier
@@ -140,18 +159,78 @@ internal fun AuthField(
                         .heightIn(min = 54.dp)
                         .background(PwColors.SurfaceCard, ControlShape)
                         .border(1.dp, if (error == null) borderColor else PwColors.StatusAlert, ControlShape)
-                        .padding(horizontal = 16.dp),
+                        .padding(start = 16.dp, end = if (trailing == null) 16.dp else 4.dp),
                     contentAlignment = Alignment.CenterStart,
                 ) {
-                    if (value.isEmpty() && placeholder != null) {
-                        Text(placeholder, style = pwText(textSize, color = PwColors.TextMuted.copy(alpha = 0.6f)))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                            if (value.isEmpty() && placeholder != null) {
+                                Text(placeholder, style = pwText(textSize, color = PlaceholderColor))
+                            }
+                            inner()
+                        }
+                        trailing?.invoke()
                     }
-                    inner()
                 }
             },
         )
         if (error != null) FieldError(error)
     }
+}
+
+/**
+ * Champ mot de passe avec l'œil Lucide « eye » / « eye-off » pour afficher ou masquer la saisie
+ * (inscription, connexion, nouveau mot de passe). Masqué par défaut.
+ */
+@Composable
+internal fun AuthPasswordField(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    placeholder: String? = null,
+    error: String? = null,
+    textSize: Float = 15f,
+    borderColor: Color = PwColors.Border,
+    enabled: Boolean = true,
+    keyboardOptions: KeyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+    keyboardActions: KeyboardActions = KeyboardActions.Default,
+    onFocusLost: (() -> Unit)? = null,
+) {
+    var visible by rememberSaveable { mutableStateOf(false) }
+    AuthField(
+        label = label,
+        value = value,
+        onValueChange = onValueChange,
+        modifier = modifier,
+        placeholder = placeholder,
+        error = error,
+        textSize = textSize,
+        borderColor = borderColor,
+        enabled = enabled,
+        keyboardOptions = keyboardOptions.copy(
+            keyboardType = if (visible) KeyboardType.Text else KeyboardType.Password,
+            autoCorrectEnabled = false,
+        ),
+        keyboardActions = keyboardActions,
+        visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
+        onFocusLost = onFocusLost,
+        trailing = {
+            Box(
+                Modifier
+                    .size(44.dp)
+                    .clickable(enabled = enabled, role = Role.Button) { visible = !visible },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    if (visible) PwIcons.EyeOff else PwIcons.Eye,
+                    contentDescription = if (visible) "Masquer le mot de passe" else "Afficher le mot de passe",
+                    tint = PwColors.TextMuted,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+        },
+    )
 }
 
 @Composable
@@ -176,8 +255,8 @@ internal fun AuthPrimaryButton(
         modifier
             .fillMaxWidth()
             .height(56.dp)
-            .alpha(if (enabled || loading) 1f else 0.4f)
-            .background(PwColors.Action, ControlShape)
+            // Désactivé : fond action à 40 %, texte blanc, comme « Suivant » du profil du chien (PwPrimaryButton).
+            .background(if (enabled || loading) PwColors.Action else PwColors.Action.copy(alpha = DISABLED_ALPHA), ControlShape)
             .clickable(enabled = enabled && !loading, role = Role.Button, onClick = onClick)
             .semantics { if (!enabled) disabled() },
         contentAlignment = Alignment.Center,
@@ -284,12 +363,17 @@ private fun Banner(message: String, icon: ImageVector, tint: Color, surface: Col
  */
 @Composable
 internal fun TermsCheckbox(checked: Boolean, onChange: (Boolean) -> Unit, enabled: Boolean, error: String?) {
+    // Cocher la case quitte le champ en cours (clavier fermé) : ses erreurs éventuelles s'affichent.
+    val focusManager = LocalFocusManager.current
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(
             Modifier
                 .fillMaxWidth()
                 .heightIn(min = 44.dp)
-                .toggleable(value = checked, enabled = enabled, role = Role.Checkbox, onValueChange = onChange),
+                .toggleable(value = checked, enabled = enabled, role = Role.Checkbox) {
+                    focusManager.clearFocus()
+                    onChange(it)
+                },
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.Top,
         ) {
@@ -328,6 +412,12 @@ internal fun Gap(height: Dp) = Spacer(Modifier.height(height))
 
 @Composable
 internal fun HGap(width: Dp) = Spacer(Modifier.width(width))
+
+/** Placeholders gris de tous les champs (« Alex », « alex@exemple.fr », « 06 12 34 56 78 »…). */
+internal val PlaceholderColor = PwColors.TextMuted.copy(alpha = 0.6f)
+
+/** Opacité du fond d'un bouton désactivé (comme « Suivant » du profil du chien). */
+private const val DISABLED_ALPHA = 0.4f
 
 private val AlertCircle = PwIcons.AlertCircle
 private val Envelope = PwIcons.Mail
