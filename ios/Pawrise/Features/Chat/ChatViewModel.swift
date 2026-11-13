@@ -24,8 +24,8 @@ struct ChatMessage: Identifiable, Equatable, Sendable {
 @MainActor
 @Observable
 final class ChatViewModel {
-    /// Fil stable pour toute la session de ce chien.
-    let threadId: String
+    /// Fil de la conversation ; un nouveau fil à chaque « Nouvelle conversation ».
+    private(set) var threadId: String
     private(set) var messages: [ChatMessage] = []
     /// Un tour est en cours : points de saisie affichés, envoi désactivé.
     private(set) var isResponding = false
@@ -85,6 +85,18 @@ final class ChatViewModel {
         if messages.last?.role == .owner {
             failure = Self.interruptedMessage
         }
+    }
+
+    /// « Nouvelle conversation » : interrompt le tour en cours, vide le fil et repart sur un nouveau fil.
+    func reset() {
+        turnTask?.cancel()
+        turnTask = nil
+        activeTurnID = nil
+        threadId = UUID().uuidString
+        messages = []
+        isResponding = false
+        statusText = nil
+        failure = nil
     }
 
     /// Attend la fin du tour en cours (tests).

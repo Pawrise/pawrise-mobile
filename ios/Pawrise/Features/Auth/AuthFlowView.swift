@@ -78,15 +78,15 @@ struct LoginView: View {
 
     @Environment(SessionStore.self) private var session
     @Environment(\.dismiss) private var dismiss
-    @State private var email = ""
-    @State private var password = ""
+    @State private var form = LoginForm()
     @State private var isSubmitting = false
     @State private var errorMessage: String?
     @FocusState private var focus: Field?
 
     private enum Field { case email, password }
 
-    private var canSubmit: Bool { !email.isEmpty && !password.isEmpty && !isSubmitting }
+    /// « Se connecter » reste grisé tant que l'e-mail n'est pas valide ou que le mot de passe est vide.
+    private var canSubmit: Bool { form.isValid && !isSubmitting }
 
     var body: some View {
         ScrollView {
@@ -107,7 +107,8 @@ struct LoginView: View {
                 AuthTitle(title: "Connexion", subtitle: "Retrouvez vos chiens et leur suivi.", subtitleSize: 14)
 
                 LabeledField(label: "E-mail") {
-                    TextField("", text: $email, prompt: Text("vous@exemple.fr"))
+                    // `verbatim` : une adresse dans un `LocalizedStringKey` devient un lien (texte bleu).
+                    TextField("", text: $form.email, prompt: Text(verbatim: "vous@exemple.fr"))
                         .credentialContentType(.username)
                         .keyboardType(.emailAddress)
                         .textInputAutocapitalization(.never)
@@ -117,14 +118,12 @@ struct LoginView: View {
                         .onSubmit { focus = .password }
                 }
                 LabeledField(label: "Mot de passe") {
-                    SecureField("", text: $password)
-                        .credentialContentType(.password)
-                        .focused($focus, equals: .password)
+                    PasswordInput(text: $form.password, contentType: .password, focus: $focus, focusValue: .password)
                         .submitLabel(.go)
                         .onSubmit(submit)
                 }
 
-                Button("Mot de passe oublié ?") { onForgotPassword(email) }
+                Button("Mot de passe oublié ?") { onForgotPassword(form.email) }
                     .buttonStyle(.pawriseCompactLink)
                     .frame(maxWidth: .infinity, alignment: .trailing)
 
@@ -133,6 +132,7 @@ struct LoginView: View {
                 Button("Se connecter", action: submit)
                     .buttonStyle(.pawrisePrimary(loading: isSubmitting))
                     .disabled(!canSubmit)
+                    .accessibilityHint(form.isValid ? "" : "Saisissez une adresse e-mail valide et votre mot de passe.")
 
                 Button("Créer un compte", action: onSignupInstead)
                     .buttonStyle(.pawriseCompactLink)
@@ -155,7 +155,7 @@ struct LoginView: View {
         Task {
             defer { isSubmitting = false }
             do {
-                try await session.login(email: email, password: password)
+                try await session.login(email: form.email, password: form.password)
             } catch {
                 errorMessage = error.localizedDescription
             }
@@ -170,51 +170,17 @@ struct SignupView: View {
 
     @Environment(SessionStore.self) private var session
     @Environment(\.dismiss) private var dismiss
-    @State private var firstName = ""
-    @State private var lastName = ""
-    @State private var email = ""
-    @State private var phone = ""
-    @State private var password = ""
-    @State private var acceptsTerms = false
+    @State private var form = SignupForm()
+    /// Champs déjà quittés par l'utilisateur : leur erreur s'affiche dès lors (pas avant).
+    @State private var touched: Set<SignupForm.Field> = []
     @State private var isSubmitting = false
-    @State private var showErrors = false
     @State private var errorMessage: String?
     /// Erreurs par champ renvoyées par le serveur (VALIDATION_FAILED), affichées sous le champ.
     @State private var serverErrors: [String: String] = [:]
-    @FocusState private var focus: Field?
+    @FocusState private var focus: SignupForm.Field?
 
-    private enum Field { case firstName, lastName, email, phone, password }
-
-    private var firstNameError: String? {
-        firstName.trimmingCharacters(in: .whitespaces).isEmpty ? "Indiquez votre prénom." : nil
-    }
-
-    private var lastNameError: String? {
-        lastName.trimmingCharacters(in: .whitespaces).isEmpty ? "Indiquez votre nom." : nil
-    }
-
-    private var emailError: String? {
-        CredentialRules.isValidEmail(email) ? nil : "Saisissez une adresse e-mail valide, par exemple alex@exemple.fr."
-    }
-
-    private var phoneError: String? {
-        let trimmed = phone.trimmingCharacters(in: .whitespaces)
-        return trimmed.isEmpty || CredentialRules.e164Phone(trimmed) != nil
-            ? nil : "Saisissez un numéro valide, par exemple 06 12 34 56 78."
-    }
-
-    private var passwordError: String? {
-        CredentialRules.isValidPassword(password)
-            ? nil
-            : "Le mot de passe doit faire au moins \(CredentialRules.passwordMinLength) caractères."
-    }
-
-    private var termsError: String? {
-        acceptsTerms ? nil : "Acceptez les conditions d’utilisation pour continuer."
-    }
-
-    private func error(_ local: String?, server field: String) -> String? {
-        showErrors ? (local ?? serverErrors[field]) : serverErrors[field]
+    private func error(_ field: SignupForm.Field, server key: String) -> String? {
+        touched.contains(field) ? (form.error(for: field) ?? serverErrors[key]) : serverErrors[key]
     }
 
     var body: some View {
@@ -232,23 +198,24 @@ struct SignupView: View {
 
                     VStack(alignment: .leading, spacing: 12) {
                         HStack(alignment: .top, spacing: 12) {
-                            LabeledField(label: "Prénom", error: error(firstNameError, server: "firstName"), fieldFont: Self.fieldFont, borderColor: Color.Pawrise.borderStrong) {
-                                TextField("", text: $firstName, prompt: Text("Alex"))
+                            LabeledField(label: "Prénom", error: error(.firstName, server: "firstName"), fieldFont: Self.fieldFont, borderColor: Color.Pawrise.borderStrong) {
+                                TextField("", text: $form.firstName, prompt: Text("Alex"))
                                     .textContentType(.givenName)
                                     .focused($focus, equals: .firstName)
                                     .submitLabel(.next)
                                     .onSubmit { focus = .lastName }
                             }
-                            LabeledField(label: "Nom", error: error(lastNameError, server: "lastName"), fieldFont: Self.fieldFont, borderColor: Color.Pawrise.borderStrong) {
-                                TextField("", text: $lastName, prompt: Text("Martin"))
+                            LabeledField(label: "Nom", error: error(.lastName, server: "lastName"), fieldFont: Self.fieldFont, borderColor: Color.Pawrise.borderStrong) {
+                                TextField("", text: $form.lastName, prompt: Text("Martin"))
                                     .textContentType(.familyName)
                                     .focused($focus, equals: .lastName)
                                     .submitLabel(.next)
                                     .onSubmit { focus = .email }
                             }
                         }
-                        LabeledField(label: "E-mail", error: error(emailError, server: "email"), fieldFont: Self.fieldFont, borderColor: Color.Pawrise.borderStrong) {
-                            TextField("", text: $email, prompt: Text("alex@exemple.fr"))
+                        LabeledField(label: "E-mail", error: error(.email, server: "email"), fieldFont: Self.fieldFont, borderColor: Color.Pawrise.borderStrong) {
+                            // `verbatim` : une adresse dans un `LocalizedStringKey` devient un lien (texte bleu).
+                            TextField("", text: $form.email, prompt: Text(verbatim: "alex@exemple.fr"))
                                 .credentialContentType(.emailAddress)
                                 .keyboardType(.emailAddress)
                                 .textInputAutocapitalization(.never)
@@ -257,28 +224,37 @@ struct SignupView: View {
                                 .submitLabel(.next)
                                 .onSubmit { focus = .phone }
                         }
-                        LabeledField(label: "Téléphone", error: error(phoneError, server: "phoneNumber"), fieldFont: Self.fieldFont, borderColor: Color.Pawrise.borderStrong) {
-                            TextField("", text: $phone)
+                        LabeledField(label: "Téléphone", error: error(.phone, server: "phoneNumber"), fieldFont: Self.fieldFont, borderColor: Color.Pawrise.borderStrong) {
+                            TextField("", text: $form.phone, prompt: Text(verbatim: PhoneInput.placeholder))
                                 .textContentType(.telephoneNumber)
                                 .keyboardType(.phonePad)
                                 .focused($focus, equals: .phone)
                                 .accessibilityHint("Facultatif")
+                                // Mise en forme pendant la saisie (PhoneNumberKit, région FR par défaut).
+                                .onChange(of: form.phone) { _, value in
+                                    let formatted = PhoneInput.formatWhileTyping(value)
+                                    if formatted != value { form.phone = formatted }
+                                }
                         }
-                        LabeledField(label: "Mot de passe", error: error(passwordError, server: "password"), fieldFont: Self.fieldFont, borderColor: Color.Pawrise.borderStrong) {
-                            SecureField("", text: $password, prompt: Text("8 caractères minimum"))
-                                .credentialContentType(.newPassword)
-                                .focused($focus, equals: .password)
-                                .submitLabel(.go)
-                                .onSubmit(submit)
+                        LabeledField(label: "Mot de passe", error: error(.password, server: "password"), fieldFont: Self.fieldFont, borderColor: Color.Pawrise.borderStrong) {
+                            PasswordInput(
+                                text: $form.password, prompt: "8 caractères minimum", contentType: .newPassword,
+                                focus: $focus, focusValue: .password
+                            )
+                            .submitLabel(.go)
+                            .onSubmit(submit)
                         }
 
-                        TermsCheckbox(isOn: $acceptsTerms, error: error(termsError, server: "acceptedTermsVersion"))
+                        TermsCheckbox(isOn: $form.acceptsTerms, error: error(.terms, server: "acceptedTermsVersion"))
+                            .onChange(of: form.acceptsTerms) { touched.insert(.terms) }
 
                         if let errorMessage { ErrorBanner(message: errorMessage) }
 
+                        // Grisé tant que le formulaire est incomplet ou invalide (même style que « Suivant »).
                         Button("Continuer", action: submit)
                             .buttonStyle(.pawrisePrimary(loading: isSubmitting))
-                            .disabled(isSubmitting)
+                            .disabled(!form.isValid || isSubmitting)
+                            .accessibilityHint(form.isValid ? "" : "Remplissez les champs obligatoires et acceptez les conditions pour continuer.")
 
                         Button("J’ai déjà un compte", action: onLoginInstead)
                             .buttonStyle(.pawriseCompactLink)
@@ -292,6 +268,9 @@ struct SignupView: View {
             .scrollDismissesKeyboard(.interactively)
             .scrollIndicators(.hidden)
         }
+        .onChange(of: focus) { previous, _ in
+            if let previous { touched.insert(previous) }
+        }
         .pawrisePage()
         .toolbar(.hidden, for: .navigationBar)
     }
@@ -300,21 +279,22 @@ struct SignupView: View {
     private static let fieldFont = Font.Pawrise.inter(17)
 
     private func submit() {
-        showErrors = true
+        guard form.isValid, !isSubmitting else {
+            // Validation au clavier (« Aller ») sur un formulaire incomplet : on montre toutes les erreurs.
+            touched = Set(SignupForm.Field.allCases)
+            return
+        }
         serverErrors = [:]
-        let localErrors = [firstNameError, lastNameError, emailError, phoneError, passwordError, termsError]
-        guard localErrors.allSatisfy({ $0 == nil }), !isSubmitting else { return }
         focus = nil
         isSubmitting = true
         errorMessage = nil
-        let trimmedPhone = phone.trimmingCharacters(in: .whitespaces)
+        let form = form
         Task {
             defer { isSubmitting = false }
             do {
                 try await session.register(
-                    firstName: firstName, lastName: lastName, email: email,
-                    phoneNumber: trimmedPhone.isEmpty ? nil : CredentialRules.e164Phone(trimmedPhone),
-                    password: password
+                    firstName: form.firstName, lastName: form.lastName, email: form.email,
+                    phoneNumber: form.e164Phone, password: form.password
                 )
             } catch let error as APIError where !error.fieldErrors.isEmpty {
                 for field in error.fieldErrors {
@@ -407,7 +387,7 @@ struct ForgotPasswordView: View {
                 )
 
                 LabeledField(label: "E-mail") {
-                    TextField("", text: $email, prompt: Text("vous@exemple.fr"))
+                    TextField("", text: $email, prompt: Text(verbatim: "vous@exemple.fr"))
                         .credentialContentType(.username)
                         .keyboardType(.emailAddress)
                         .textInputAutocapitalization(.never)
@@ -418,18 +398,19 @@ struct ForgotPasswordView: View {
 
                 if codeSent {
                     LabeledField(label: "Code à 6 chiffres") {
-                        TextField("", text: $code, prompt: Text("123456"))
+                        TextField("", text: $code, prompt: Text(verbatim: "123456"))
                             .textContentType(.oneTimeCode)
                             .keyboardType(.numberPad)
                             .focused($focus, equals: .code)
                             .onChange(of: code) { _, value in code = String(value.filter(\.isNumber).prefix(6)) }
                     }
                     LabeledField(label: "Nouveau mot de passe") {
-                        SecureField("", text: $newPassword, prompt: Text("8 caractères minimum"))
-                            .credentialContentType(.newPassword)
-                            .focused($focus, equals: .password)
-                            .submitLabel(.go)
-                            .onSubmit(submit)
+                        PasswordInput(
+                            text: $newPassword, prompt: "8 caractères minimum", contentType: .newPassword,
+                            focus: $focus, focusValue: .password
+                        )
+                        .submitLabel(.go)
+                        .onSubmit(submit)
                     }
                 }
 

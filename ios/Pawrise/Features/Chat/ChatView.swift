@@ -34,6 +34,7 @@ private struct ChatConversationView: View {
     let model: ChatViewModel
 
     @Environment(TabRouter.self) private var router
+    @Environment(SessionStore.self) private var session
     @State private var draft = ""
     @FocusState private var isComposerFocused: Bool
 
@@ -41,7 +42,10 @@ private struct ChatConversationView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            ChatHeader(dog: dog)
+            ChatHeader(dog: dog, canReset: !model.messages.isEmpty || model.isResponding) {
+                draft = ""
+                model.reset()
+            }
 
             ScrollViewReader { proxy in
                 ScrollView {
@@ -109,10 +113,9 @@ private struct ChatConversationView: View {
         }
     }
 
-    /// « Bonjour 👋 Je suis Pawrise… » : l'émoji est rendu avec la police système (Inter n'en a pas).
+    /// « Bonjour Alex 👋 Je suis Pawrise, l'assistant de Nala… » (prénom du compte connecté).
     private var welcome: Text {
-        let wave = Text("👋").font(.system(size: ChatLayout.bubbleFontSize))
-        return Text("Bonjour \(wave) Je suis Pawrise, l'assistant de \(dog.name). Que souhaitez-vous consulter ?")
+        ChatWelcome.text(ownerFirstName: session.user?.firstName, dogName: dog.name, fontSize: ChatLayout.bubbleFontSize)
     }
 
     /// Change à chaque nouvel élément du fil pour déclencher le défilement vers le bas.
@@ -203,9 +206,12 @@ private struct TopAlignedThread: ViewModifier {
 
 private struct ChatHeader: View {
     let dog: Dog
+    var canReset = false
+    var onReset: () -> Void = {}
 
     var body: some View {
         HStack(spacing: 12) {
+            HStack(spacing: 12) {
             DogAvatar(photo: dog.photo, size: 44, cornerRadius: 16)
             VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 6) {
@@ -225,14 +231,26 @@ private struct ChatHeader: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
             }
+            }
+            .accessibilityElement(children: .combine)
             Spacer(minLength: 0)
+            if canReset {
+                Button(action: onReset) {
+                    PawriseIcon(.trash, size: 22)
+                        .foregroundStyle(Color.Pawrise.textMuted)
+                        .frame(width: 44, height: 44)
+                        .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Nouvelle conversation")
+                .accessibilityIdentifier("chat-reset")
+            }
         }
         // Maquette : cadre de 82 pt, contenu centré (20 pt au-dessus, 18 pt au-dessous).
         .padding(.top, 20)
         .padding(.horizontal, 16)
         .padding(.bottom, 18)
         .background(Color.Pawrise.page)
-        .accessibilityElement(children: .combine)
     }
 }
 

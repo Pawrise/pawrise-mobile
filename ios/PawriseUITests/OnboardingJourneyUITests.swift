@@ -15,10 +15,17 @@ final class OnboardingJourneyUITests: PawriseUITestCase {
         type(fields.element(boundBy: 2), "alex.\(Int.random(in: 1000...9999))@example.com")
         type(app.secureTextFields.element(boundBy: 0), "un-mot-de-passe-solide")
 
-        // Sans les CGU, l'inscription est refusée (RG11).
-        tap(button: "Continuer")
+        // Sans les CGU, l'inscription est impossible (RG11) : « Continuer » reste grisé, et décocher la case affiche
+        // le message.
+        let continueButton = app.buttons["Continuer"]
+        XCTAssertFalse(continueButton.isEnabled)
+        let terms = app.descendants(matching: .any).matching(identifier: "terms-checkbox").firstMatch
+        terms.tap()
+        XCTAssertTrue(continueButton.isEnabled)
+        terms.tap()
         XCTAssertTrue(app.staticTexts["Acceptez les conditions d’utilisation pour continuer."].waitForExistence(timeout: 3))
-        app.descendants(matching: .any).matching(identifier: "terms-checkbox").firstMatch.tap()
+        XCTAssertFalse(continueButton.isEnabled)
+        terms.tap()
         tap(button: "Continuer")
 
         // Découverte (5 étapes)
@@ -40,6 +47,71 @@ final class OnboardingJourneyUITests: PawriseUITestCase {
         snapshot("08-detail-rythme")
     }
 
+    /// Inscription : « Continuer » grisé tant que le formulaire est incomplet ou invalide, erreurs affichées une fois
+    /// le champ quitté, téléphone mis en forme pendant la saisie, œil pour afficher le mot de passe.
+    func testSignupFormValidationPhoneAndPasswordVisibility() {
+        tap(button: "Créer un compte")
+        XCTAssertTrue(app.staticTexts["Quelques informations, puis on vous montre Pawrise."].waitForExistence(timeout: 5))
+        let continueButton = app.buttons["Continuer"]
+        XCTAssertFalse(continueButton.isEnabled)
+        // Aucune erreur avant d'avoir touché les champs.
+        XCTAssertFalse(app.staticTexts["Indiquez votre prénom."].exists)
+
+        let fields = app.textFields
+        type(fields.element(boundBy: 0), "Alex")
+        type(fields.element(boundBy: 1), "Martin")
+        type(fields.element(boundBy: 2), "alex@example")
+        // E-mail incomplet quitté : message affiché, bouton toujours grisé.
+        fields.element(boundBy: 3).tap()
+        XCTAssertTrue(app.staticTexts["Saisissez une adresse e-mail valide, par exemple alex@exemple.fr."].waitForExistence(timeout: 3))
+        XCTAssertFalse(continueButton.isEnabled)
+        type(fields.element(boundBy: 2), ".com")
+        XCTAssertFalse(app.staticTexts["Saisissez une adresse e-mail valide, par exemple alex@exemple.fr."].exists)
+
+        // Téléphone mis en forme pendant la saisie (région FR).
+        type(fields.element(boundBy: 3), "0612345678")
+        XCTAssertEqual(fields.element(boundBy: 3).value as? String, "06 12 34 56 78")
+
+        // Mot de passe : l'œil l'affiche puis le masque.
+        type(app.secureTextFields.element(boundBy: 0), "chien-26")
+        dismissPasswordSheetIfShown()
+        let show = app.buttons["Afficher le mot de passe"]
+        XCTAssertTrue(show.exists)
+        show.tap()
+        XCTAssertTrue(app.buttons["Masquer le mot de passe"].waitForExistence(timeout: 3))
+        XCTAssertEqual(fields.element(boundBy: 4).value as? String, "chien-26")
+        XCTAssertEqual(app.secureTextFields.count, 0)
+        app.buttons["Masquer le mot de passe"].tap()
+        XCTAssertEqual(app.secureTextFields.count, 1)
+        XCTAssertEqual((app.secureTextFields.element(boundBy: 0).value as? String)?.count, 8)
+
+        XCTAssertFalse(continueButton.isEnabled) // CGU non cochées
+        let terms = app.descendants(matching: .any).matching(identifier: "terms-checkbox").firstMatch
+        for _ in 0..<3 where !terms.isHittable { app.swipeUp() }
+        terms.tap()
+        XCTAssertTrue(continueButton.isEnabled)
+        snapshot("11-inscription-valide")
+    }
+
+    /// Connexion : « Se connecter » grisé sans e-mail valide ni mot de passe ; œil sur le mot de passe.
+    func testLoginButtonDisabledUntilValidAndPasswordVisibility() {
+        tap(button: "Se connecter")
+        XCTAssertTrue(app.staticTexts["Connexion"].waitForExistence(timeout: 5))
+        let login = app.buttons.matching(NSPredicate(format: "label == 'Se connecter'")).firstMatch
+        XCTAssertFalse(login.isEnabled)
+        type(app.textFields.firstMatch, "alex@example")
+        type(app.secureTextFields.firstMatch, "chien-26")
+        XCTAssertFalse(login.isEnabled) // e-mail invalide
+        type(app.textFields.firstMatch, ".com")
+        XCTAssertTrue(login.isEnabled)
+
+        app.buttons["Afficher le mot de passe"].tap()
+        XCTAssertEqual(app.secureTextFields.count, 0)
+        XCTAssertTrue(app.buttons["Masquer le mot de passe"].exists)
+        app.buttons["Masquer le mot de passe"].tap()
+        XCTAssertEqual(app.secureTextFields.count, 1)
+    }
+
     /// Compte de démo → onglet Chat IA → question au vrai pawrise-assistant (doit tourner sur :8100).
     func testDemoAccountChatsWithAssistant() throws {
         tap(button: "Se connecter")
@@ -59,6 +131,7 @@ final class OnboardingJourneyUITests: PawriseUITestCase {
         }
         XCTAssertTrue(suggestion.waitForExistence(timeout: 5))
         snapshot("09-chat-accueil")
+        dismissSavePasswordPrompt(within: 2)
         suggestion.tap()
 
         let unreachable = app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'injoignable'")).firstMatch
