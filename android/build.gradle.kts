@@ -28,5 +28,12 @@ subprojects {
         val contractUrl = providers.gradleProperty("pawrise.contractUrl")
         inputs.property("pawrise.contractUrl", contractUrl.orElse(""))
         contractUrl.orNull?.let { systemProperty("pawrise.contractUrl", it) }
+        // Captures d'écran comparées à la maquette (ScreenCaptureTest) : -Ppawrise.captureDir=/chemin
+        val captureDir = providers.gradleProperty("pawrise.captureDir")
+        inputs.property("pawrise.captureDir", captureDir.orElse(""))
+        captureDir.orNull?.let {
+            systemProperty("pawrise.captureDir", it)
+            outputs.upToDateWhen { false }
+        }
     }
 }

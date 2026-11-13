@@ -10,7 +10,6 @@ import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
 import com.pawrise.core.auth.SessionState
-import com.pawrise.core.designsystem.component.PlaceholderScreen
 import com.pawrise.feature.auth.LoginRoute
 import com.pawrise.feature.auth.SignupRoute
 import com.pawrise.feature.auth.WelcomeRoute
@@ -85,7 +84,7 @@ fun PawriseNavDisplay(
                     onDone = { backStack.resetTo(Home) },
                 )
             }
-            entry<Home> { PlaceholderScreen("Homepage · Santé") }
+            entry<Home> { MainShell(onSignedOut = { backStack.resetTo(Welcome) }) }
         },
     )
 }

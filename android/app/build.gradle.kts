@@ -59,6 +59,9 @@ dependencies {
     implementation(project(":feature:onboarding"))
     implementation(project(":feature:dogprofile"))
     implementation(project(":feature:collar"))
+    implementation(project(":feature:home"))
+    implementation(project(":feature:chat"))
+    implementation(project(":feature:settings"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
