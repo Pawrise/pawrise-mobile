@@ -1,0 +1,13 @@
+# Lu par gitleaks (workflow partagé Pawrise/.github secret-scan.yml) : règles par défaut + exceptions.
+title = "pawrise-mobile"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Valeurs fictives : tests iOS et exemples du contrat OpenAPI servi par le mock Prism"
+paths = [
+  '''^ios/PawriseTests/''',
+  '''^ios/PawriseUITests/''',
+  '''^api/openapi\.yaml$''',
+]

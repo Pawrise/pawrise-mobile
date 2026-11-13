@@ -1,0 +1,11 @@
+#include "Shared.xcconfig"
+
+// mock : comptes simulés dans l'app (pas besoin de pawrise-auth)
+// remote : appelle PAWRISE_API_BASE_URL (contrat : Pawrise/pawrise-auth/docs/api-contract.md)
+PAWRISE_AUTH_MODE = mock
+PAWRISE_API_BASE_URL = http:/$()/localhost:8200
+// pawrise-assistant en local (uv run dev). Sur iPhone physique : IP du Mac, voir ios/README.md
+PAWRISE_ASSISTANT_BASE_URL = http:/$()/127.0.0.1:8100
+PAWRISE_ASSISTANT_PET_REF = pet_demo_nala
+
+#include? "Local.xcconfig"

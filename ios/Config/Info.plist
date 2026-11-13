@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>PawriseAuthMode</key>
+	<string>$(PAWRISE_AUTH_MODE)</string>
+	<key>PawriseAPIBaseURL</key>
+	<string>$(PAWRISE_API_BASE_URL)</string>
+	<key>PawriseAssistantBaseURL</key>
+	<string>$(PAWRISE_ASSISTANT_BASE_URL)</string>
+	<key>PawriseAssistantPetRef</key>
+	<string>$(PAWRISE_ASSISTANT_PET_REF)</string>
+	<key>PawriseTermsURL</key>
+	<string>$(PAWRISE_TERMS_URL)</string>
+	<key>PawrisePrivacyURL</key>
+	<string>$(PAWRISE_PRIVACY_URL)</string>
+	<key>GIDClientID</key>
+	<string>$(GOOGLE_CLIENT_ID)</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>$(GOOGLE_REVERSED_CLIENT_ID)</string>
+			</array>
+		</dict>
+	</array>
+	<key>UIAppFonts</key>
+	<array>
+		<string>BricolageGrotesque-SemiBold.ttf</string>
+		<string>BricolageGrotesque-Bold.ttf</string>
+		<string>BricolageGrotesque-ExtraBold.ttf</string>
+		<string>BricolageGrotesque-Variable.ttf</string>
+		<string>PawriseSymbols-Regular.ttf</string>
+		<string>Inter-Regular.ttf</string>
+		<string>Inter-Medium.ttf</string>
+		<string>Inter-SemiBold.ttf</string>
+		<string>Inter-Bold.ttf</string>
+		<string>DMMono-Regular.ttf</string>
+		<string>DMMono-Medium.ttf</string>
+	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>La caméra sert à scanner le QR code du collier Pawrise.</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>En développement, l'app contacte l'assistant Pawrise sur votre réseau local.</string>
+</dict>
+</plist>

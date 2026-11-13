@@ -1,0 +1,10 @@
+// Réglages communs. Les URL utilisent "/$()/" car "//" commence un commentaire en xcconfig.
+PAWRISE_BUNDLE_ID = fr.pawrise.app
+
+// Google Sign-In : renseigner dans Config/Local.xcconfig (non versionné), voir ios/README.md
+GOOGLE_CLIENT_ID =
+GOOGLE_REVERSED_CLIENT_ID = com.googleusercontent.apps.not-configured
+
+// Pages légales (Paramètres → Légal). Vides tant qu'elles ne sont pas publiées : l'app l'indique.
+PAWRISE_TERMS_URL =
+PAWRISE_PRIVACY_URL =
