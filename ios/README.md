@@ -45,7 +45,9 @@ cd ../pawrise-assistant   # git clone git@github.com:Pawrise/pawrise-assistant.g
 uv sync && uv run dev     # http://127.0.0.1:8100, sans clé API
 ```
 
-En Debug, l'app envoie `pet_ref = pet_demo_nala` (chien de démo de l'assistant) quel que soit le chien affiché, tant que la Core API ne fournit pas les profils.
+L'app envoie `pet_ref` = id du chien affiché ; l'assistant lit son profil et ses mesures sur l'API-CORE (`PAWRISE_CORE_API_URL` côté assistant). Pour forcer un chien de démo de l'assistant : `PAWRISE_ASSISTANT_PET_REF = pet_demo_nala` dans `Config/Local.xcconfig`.
+
+En mode remote, les chiens (profil, photo, collier) viennent de l'API-CORE : `PAWRISE_CORE_BASE_URL` (défaut `http://localhost:3000/v1`). En mode mock, ils restent dans un fichier local.
 
 Sur un **iPhone physique**, `uv run dev` n'écoute que sur 127.0.0.1. Lancer plutôt :
 

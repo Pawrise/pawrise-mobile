@@ -1,9 +1,19 @@
 import Foundation
 
-/// Association d'un collier à un chien. Aujourd'hui simulée ; plus tard via la Core API
-/// (vérification du code, liaison au certificat step-ca du collier, premier message MQTT).
+/// Association d'un collier au chien en cours d'ajout (`dog` : profil saisi, sans collier).
+/// Simulée en mode mock ; en mode remote, `PUT /v1/pets/{petId}/collar` sur l'API-CORE.
 protocol CollarService: Sendable {
-    func activate(code: String, for dogName: String) async throws -> Collar
+    func activate(code: String, for dog: Dog) async throws -> Collar
+}
+
+/// Le contrat associe le collier à un chien existant : le chien est d'abord créé sur l'API-CORE
+/// (une seule fois par brouillon), puis le collier lui est associé. Voir `DogStore.registerCollar`.
+struct RemoteCollarService: CollarService {
+    let store: DogStore
+
+    func activate(code: String, for dog: Dog) async throws -> Collar {
+        try await store.registerCollar(code: code, draft: dog)
+    }
 }
 
 enum CollarActivationError: LocalizedError, Equatable {
@@ -30,7 +40,7 @@ struct MockCollarService: CollarService {
 
     var latency: Duration = .milliseconds(1500)
 
-    func activate(code: String, for dogName: String) async throws -> Collar {
+    func activate(code: String, for dog: Dog) async throws -> Collar {
         let normalized = Collar.normalize(code)
         guard Collar.isValidCode(normalized) else { throw CollarActivationError.invalidCode }
         try await Task.sleep(for: latency)

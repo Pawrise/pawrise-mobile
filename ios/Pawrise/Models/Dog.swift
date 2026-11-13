@@ -61,6 +61,14 @@ struct Collar: Codable, Hashable, Sendable {
 }
 
 enum DogCatalog {
+    /// Race affichée quand elle n'est pas connue (« Je ne sais pas », ou liste de races vide côté API).
+    static let unknownBreedLabel = "Race inconnue"
+    /// Choix « Je ne sais pas » de la liste : aucune race envoyée à l'API.
+    static let unknownBreedChoice = "Je ne sais pas"
+    /// « Croisé » = race `mixed` de l'API-CORE (contrat, D2).
+    static let mixedBreedChoice = "Croisé"
+    static let mixedBreedCode = "mixed"
+
     /// Races proposées à la saisie (ordre du prototype), extensible vers une vraie base.
     static let breeds = [
         "Je ne sais pas", "Croisé", "Akita Inu", "Beagle", "Berger Allemand", "Berger Australien",

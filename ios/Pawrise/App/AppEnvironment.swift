@@ -15,7 +15,17 @@ final class AppEnvironment {
     let onboarding = OnboardingProgress()
 
     /// Données simulées affichées dans Santé : normal ou anomalie (réglable dans Paramètres).
-    var healthScenario: HealthScenario = .normal
+    /// En mode remote, aussi envoyé à l'API-CORE pour que le chatbot voie le même scénario.
+    var healthScenario: HealthScenario = .normal {
+        didSet {
+            guard healthScenario != oldValue else { return }
+            syncHealthScenario(reportingFailure: true)
+        }
+    }
+
+    /// Message discret quand le scénario n'a pas pu être envoyé à l'API-CORE (le changement local reste).
+    private(set) var scenarioSyncError: String?
+    @ObservationIgnored private var scenarioSyncTask: Task<Void, Never>?
 
     init(config: AppConfig = .current) {
         self.config = config
@@ -26,14 +36,51 @@ final class AppEnvironment {
         }
         Task { await tokens.setRefresher { try await auth.refresh(refreshToken: $0) } }
 
-        self.session = SessionStore(auth: auth, tokens: tokens)
-        self.dogs = DogStore(repository: LocalDogRepository())
+        let session = SessionStore(auth: auth, tokens: tokens)
+        self.session = session
+        switch config.authMode {
+        case .mock:
+            self.dogs = DogStore(repository: LocalDogRepository())
+            self.collars = MockCollarService()
+        case .remote:
+            let core = APIClient(baseURL: config.coreBaseURL, tokens: tokens)
+            let dogs = DogStore(backend: .remote(RemotePetService(client: core)))
+            self.dogs = dogs
+            self.collars = RemoteCollarService(store: dogs)
+        }
         self.health = SeedHealthRepository()
-        self.collars = MockCollarService()
         self.assistant = AssistantClient(baseURL: config.assistantBaseURL, tokens: tokens)
+        self.dogs.onSessionExpired = { [weak session, weak dogs = self.dogs] in
+            dogs?.reset()
+            await session?.sessionDidExpire()
+        }
     }
 
-    /// Identifiant du chien côté assistant. En dev, forcé sur un chien de démo de pawrise-assistant.
+    /// Chiens du compte à la connexion. En mode remote, le scénario affiché est renvoyé à l'API-CORE
+    /// (il a pu changer depuis un autre appareil ou une session précédente), sans message en cas d'échec.
+    func loadDogs(for user: AuthUser) async {
+        await dogs.load(for: user)
+        if dogs.isRemote, dogs.isLoaded { syncHealthScenario(reportingFailure: false) }
+    }
+
+    private func syncHealthScenario(reportingFailure: Bool) {
+        guard dogs.isRemote else { return }
+        scenarioSyncTask?.cancel()
+        scenarioSyncError = nil
+        let scenario = healthScenario
+        scenarioSyncTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                try await dogs.syncHealthScenario(scenario)
+            } catch is CancellationError {
+            } catch {
+                guard !Task.isCancelled, reportingFailure else { return }
+                scenarioSyncError = "Scénario non transmis au serveur : l'assistant peut encore voir l'ancien."
+            }
+        }
+    }
+
+    /// Identifiant du chien côté assistant : l'id API-CORE du chien courant, sauf `pet_ref` forcé en configuration.
     func assistantPetRef(for dog: Dog) -> String {
         config.assistantPetRefOverride ?? dog.id.uuidString.lowercased()
     }
@@ -68,6 +115,8 @@ final class AppEnvironment {
     private func resetAfterSignOut() {
         dogs.reset()
         healthScenario = .normal
+        scenarioSyncTask?.cancel()
+        scenarioSyncError = nil
     }
 }
 

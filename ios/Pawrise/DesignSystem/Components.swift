@@ -260,12 +260,11 @@ struct DogAvatar: View {
     private var content: some View {
         switch photo {
         case let .remote(url):
-            AsyncImage(url: url) { phase in
-                if let image = phase.image {
-                    image.resizable().scaledToFill()
-                } else {
-                    placeholder
-                }
+            // `photoUrl` de l'API-CORE (ou photo de démo) : chargée en arrière-plan, gardée en cache.
+            CachedRemoteImage(url: url) { image in
+                image.resizable().scaledToFill()
+            } placeholder: {
+                placeholder
             }
         case let .local(data):
             if let image = UIImage(data: data) {

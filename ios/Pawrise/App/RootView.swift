@@ -47,7 +47,7 @@ private struct SignedInRoot: View {
                 MainTabView()
             }
         }
-        .task(id: user.id) { await dogs.load(for: user) }
+        .task(id: user.id) { await environment.loadDogs(for: user) }
     }
 }
 

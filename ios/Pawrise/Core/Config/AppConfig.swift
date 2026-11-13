@@ -5,14 +5,17 @@ struct AppConfig: Sendable {
     enum AuthMode: String, Sendable {
         /// Comptes simulés dans l'app, sans serveur.
         case mock
-        /// Appelle pawrise-auth via `apiBaseURL`.
+        /// Appelle pawrise-auth via `apiBaseURL` et l'API-CORE (chiens) via `coreBaseURL`.
         case remote
     }
 
     let authMode: AuthMode
     let apiBaseURL: URL
+    /// API-CORE (chiens, photos, races, collier), version comprise : `…/v1` (convention 7).
+    let coreBaseURL: URL
     let assistantBaseURL: URL
-    /// `pet_ref` envoyé à l'assistant en développement, tant que la Core API n'existe pas.
+    /// `pet_ref` forcé pour l'assistant, seulement s'il est renseigné explicitement (Local.xcconfig).
+    /// Sinon l'app envoie l'id du chien courant, que l'assistant lit sur l'API-CORE.
     let assistantPetRefOverride: String?
     let googleClientID: String?
     /// Pages publiques des CGU et de la politique de confidentialité (Paramètres → Légal). Nil tant qu'elles ne sont pas publiées.
@@ -24,6 +27,7 @@ struct AppConfig: Sendable {
     init(
         authMode: AuthMode,
         apiBaseURL: URL,
+        coreBaseURL: URL = URL(string: "http://localhost:3000/v1")!,
         assistantBaseURL: URL,
         assistantPetRefOverride: String? = nil,
         googleClientID: String? = nil,
@@ -32,6 +36,7 @@ struct AppConfig: Sendable {
     ) {
         self.authMode = authMode
         self.apiBaseURL = apiBaseURL
+        self.coreBaseURL = coreBaseURL
         self.assistantBaseURL = assistantBaseURL
         self.assistantPetRefOverride = assistantPetRefOverride
         self.googleClientID = googleClientID
@@ -48,6 +53,7 @@ struct AppConfig: Sendable {
         self.init(
             authMode: value("PawriseAuthMode").flatMap(AuthMode.init(rawValue:)) ?? .mock,
             apiBaseURL: value("PawriseAPIBaseURL").flatMap(URL.init(string:)) ?? URL(string: "http://localhost:8200")!,
+            coreBaseURL: value("PawriseCoreBaseURL").flatMap(URL.init(string:)) ?? URL(string: "http://localhost:3000/v1")!,
             assistantBaseURL: value("PawriseAssistantBaseURL").flatMap(URL.init(string:)) ?? URL(string: "http://127.0.0.1:8100")!,
             assistantPetRefOverride: value("PawriseAssistantPetRef"),
             googleClientID: value("GIDClientID"),

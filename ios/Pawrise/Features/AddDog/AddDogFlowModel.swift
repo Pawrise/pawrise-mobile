@@ -23,7 +23,7 @@ final class AddDogFlowModel {
     static let maxHeightCm = 120
     /// Âge maximal raisonnable pour une date de naissance (évite les saisies aberrantes).
     static let maxAgeYears = 30
-    static let unknownBreedLabel = "Race inconnue"
+    static let unknownBreedLabel = DogCatalog.unknownBreedLabel
 
     // MARK: Navigation
 
@@ -58,6 +58,8 @@ final class AddDogFlowModel {
     private var failedCollarCode: String?
     private(set) var collar: Collar?
     private(set) var isSaving = false
+    /// Identifiant du brouillon : le même à chaque essai, pour ne pas créer deux fois le chien sur l'API-CORE.
+    let draftID = UUID()
     private(set) var saveError: String?
 
     private let now: () -> Date
@@ -242,7 +244,7 @@ final class AddDogFlowModel {
         failedCollarCode = nil
         phase = .activating
         do {
-            let activated = try await service.activate(code: code, for: displayName)
+            let activated = try await service.activate(code: code, for: makeDraft())
             // L’utilisateur a pu revenir en arrière pendant l’activation : résultat ignoré.
             guard phase == .activating else { return }
             collar = activated
@@ -265,10 +267,17 @@ final class AddDogFlowModel {
     // MARK: Création du chien
 
     /// Chien complet, disponible une fois le collier activé.
-    func makeDog(id: UUID = UUID()) -> Dog? {
-        guard let collar, isNameValid else { return nil }
-        return Dog(
-            id: id,
+    func makeDog() -> Dog? {
+        guard let collar else { return nil }
+        var dog = makeDraft()
+        dog.collar = collar
+        return isNameValid ? dog : nil
+    }
+
+    /// Profil saisi jusqu'ici, sans collier (envoyé à l'activation du collier).
+    func makeDraft() -> Dog {
+        Dog(
+            id: draftID,
             name: trimmedName,
             breed: breed ?? Self.unknownBreedLabel,
             birthDate: birthDate.map { calendar.startOfDay(for: $0) },
@@ -277,7 +286,7 @@ final class AddDogFlowModel {
             heightCm: isHeightValid ? heightCm : nil,
             medicalNotes: trimmedMedicalNotes.isEmpty ? nil : trimmedMedicalNotes,
             photo: photo,
-            collar: collar
+            collar: nil
         )
     }
 

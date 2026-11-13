@@ -79,6 +79,10 @@ extension APIError: LocalizedError {
         case "INVALID_OR_EXPIRED_TOKEN": "Code incorrect ou expiré. Vérifiez-le ou demandez-en un nouveau."
         case "CHIEF_TRANSFER_REQUIRED": "Vous êtes le propriétaire principal d'un chien partagé. Transférez d'abord ce rôle à un autre propriétaire, puis supprimez votre compte."
         case "VALIDATION_FAILED": "Certains champs sont invalides. Vérifiez le formulaire."
+        case "PET_NOT_FOUND": "Ce chien n'existe plus sur votre compte. Rechargez l'app."
+        case "COLLAR_ALREADY_ASSIGNED": "Ce collier est déjà associé à un autre chien. Retirez-le de l'autre profil ou contactez le support."
+        case "COLLAR_NOT_ASSIGNED": "Aucun collier n'est associé à ce chien."
+        case "FILE_TOO_LARGE": "Cette photo est trop lourde. Choisissez-en une autre."
         default: nil
         }
     }
@@ -102,6 +106,14 @@ extension APIError: LocalizedError {
         case "TERMS_NOT_ACCEPTED": "Acceptez les conditions d'utilisation pour continuer."
         case "INVALID_CODE": "Le code contient 6 chiffres."
         case "TOO_LONG": "Ce champ est trop long."
+        // Chiens et colliers (openapi.yaml, tags Animaux et Colliers).
+        case "BIRTH_DATE_IN_FUTURE": "La date de naissance ne peut pas être dans le futur."
+        case "MUST_BE_POSITIVE": "Saisissez une valeur supérieure à zéro."
+        case "UNKNOWN_BREED": "Cette race n'est pas reconnue. Choisissez-la dans la liste."
+        case "UNSUPPORTED_FORMAT": "Format de photo non pris en charge. Choisissez une photo JPEG ou PNG."
+        case "UNKNOWN_SAMPLE": "Cette photo d'exemple n'est plus disponible. Choisissez-en une autre."
+        case "INVALID_COLLAR_CODE", "UNKNOWN_COLLAR":
+            "Ce code n'est pas reconnu. Il commence par PW- suivi de 6 caractères, et se trouve sous le collier."
         default: nil
         }
     }

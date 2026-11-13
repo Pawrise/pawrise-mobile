@@ -6,6 +6,8 @@
 	<string>$(PAWRISE_AUTH_MODE)</string>
 	<key>PawriseAPIBaseURL</key>
 	<string>$(PAWRISE_API_BASE_URL)</string>
+	<key>PawriseCoreBaseURL</key>
+	<string>$(PAWRISE_CORE_BASE_URL)</string>
 	<key>PawriseAssistantBaseURL</key>
 	<string>$(PAWRISE_ASSISTANT_BASE_URL)</string>
 	<key>PawriseAssistantPetRef</key>

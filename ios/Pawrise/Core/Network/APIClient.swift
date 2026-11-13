@@ -1,12 +1,20 @@
 import Foundation
 
 struct Endpoint: Sendable {
-    enum Method: String, Sendable { case get = "GET", post = "POST", patch = "PATCH", delete = "DELETE" }
+    enum Method: String, Sendable { case get = "GET", post = "POST", put = "PUT", patch = "PATCH", delete = "DELETE" }
+
+    /// Corps déjà encodé (multipart de la photo du chien, par exemple).
+    struct RawBody: Sendable {
+        let data: Data
+        let contentType: String
+    }
 
     var method: Method
     var path: String
     var body: (any Encodable & Sendable)?
     var requiresAuth: Bool
+    var query: [URLQueryItem] = []
+    var rawBody: RawBody?
 
     static func get(_ path: String, auth: Bool = true) -> Endpoint {
         Endpoint(method: .get, path: path, body: nil, requiresAuth: auth)
@@ -14,6 +22,10 @@ struct Endpoint: Sendable {
 
     static func post(_ path: String, body: (any Encodable & Sendable)? = nil, auth: Bool = true) -> Endpoint {
         Endpoint(method: .post, path: path, body: body, requiresAuth: auth)
+    }
+
+    static func put(_ path: String, body: any Encodable & Sendable) -> Endpoint {
+        Endpoint(method: .put, path: path, body: body, requiresAuth: true)
     }
 
     static func patch(_ path: String, body: any Encodable & Sendable) -> Endpoint {
@@ -80,7 +92,9 @@ final class APIClient: Sendable {
     }
 
     private func perform(_ endpoint: Endpoint, isRetry: Bool) async throws -> Data {
-        var request = URLRequest(url: baseURL.appending(path: endpoint.path))
+        var url = baseURL.appending(path: endpoint.path)
+        if !endpoint.query.isEmpty { url.append(queryItems: endpoint.query) }
+        var request = URLRequest(url: url)
         request.httpMethod = endpoint.method.rawValue
         request.timeoutInterval = 15
         request.setValue("application/json", forHTTPHeaderField: "Accept")
@@ -89,7 +103,10 @@ final class APIClient: Sendable {
             usedAccessToken = pair.accessToken
             request.setValue("Bearer \(pair.accessToken)", forHTTPHeaderField: "Authorization")
         }
-        if let body = endpoint.body {
+        if let raw = endpoint.rawBody {
+            request.setValue(raw.contentType, forHTTPHeaderField: "Content-Type")
+            request.httpBody = raw.data
+        } else if let body = endpoint.body {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             request.httpBody = try Self.encoder.encode(body)
         }

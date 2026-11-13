@@ -59,6 +59,13 @@ struct SettingsView: View {
                                 .pawriseFont(.inter, 12, lineHeight: 1.35, relativeTo: .caption)
                                 .foregroundStyle(Color.Pawrise.textMuted)
                                 .fixedSize(horizontal: false, vertical: true)
+                            if let syncError = environment.scenarioSyncError {
+                                Text(syncError)
+                                    .pawriseFont(.inter, 12, lineHeight: 1.35, relativeTo: .caption)
+                                    .foregroundStyle(Color.Pawrise.alert)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .accessibilityIdentifier("scenario-sync-error")
+                            }
                         }
                         .padding(16)
                     }
