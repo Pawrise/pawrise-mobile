@@ -213,10 +213,10 @@ private fun AccountCard(user: User, sending: Boolean, message: String?, onResend
                 Modifier.size(56.dp).background(PwColors.Action, RoundedCornerShape(16.dp)).clearAndSetSemantics {},
                 contentAlignment = Alignment.Center,
             ) {
-                Text(initials(user.fullName), style = pwText(19f, FontWeight.Bold, PwColors.ActionText, lineHeight = 1.2f))
+                Text(initials(user.fullName), style = pwText(19f, FontWeight.SemiBold, PwColors.ActionText, lineHeight = 1.2f))
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text(user.fullName, style = pwText(16f, FontWeight.Bold), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(user.fullName, style = pwText(16f, FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(user.email, style = pwText(12.5f, color = PwColors.TextMuted), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 user.phoneNumber?.let { Text(it, style = pwText(12.5f, color = PwColors.TextMuted), maxLines = 1) }
             }

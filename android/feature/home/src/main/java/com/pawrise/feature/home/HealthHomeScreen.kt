@@ -196,7 +196,8 @@ private fun HealthHeaderCard(
             .background(state.surface, shape)
             .border(1.dp, PwColors.Border, shape)
             // Figma : marges de 16 à l'intérieur du filet de 1 dp.
-            .padding(17.dp),
+            // Maquette : rangées sur x 34→360 dans une carte 17→375 (marges 17 à gauche, 15 à droite).
+            .padding(start = 17.dp, top = 17.dp, end = 15.dp, bottom = 17.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Row(Modifier.fillMaxWidth().height(20.dp), verticalAlignment = Alignment.CenterVertically) {
