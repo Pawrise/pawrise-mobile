@@ -52,7 +52,7 @@ class LoginFlowTest {
         compose.field("Mot de passe").performTextInput("chien-oslo-2026")
         compose.tap("Se connecter")
 
-        compose.onNodeWithText("Homepage · Santé", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("INDICATEURS").assertIsDisplayed()
     }
 
     @Test

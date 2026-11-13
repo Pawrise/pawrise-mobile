@@ -49,6 +49,6 @@ class StartupWithDogTest {
 
     @Test
     fun `ouverture sur la homepage`() {
-        compose.onNodeWithText("Homepage · Santé", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("INDICATEURS").assertIsDisplayed()
     }
 }
