@@ -21,6 +21,8 @@ struct MainTabView: View {
                     .transition(.opacity)
             }
         }
+        // La barre descend jusqu'au bas de l'écran (sous l'indicateur d'accueil), comme dans la maquette.
+        .ignoresSafeArea(.container, edges: isKeyboardVisible ? [] : .bottom)
         .background(Color.Pawrise.page.ignoresSafeArea())
         .environment(router)
         .environment(conversations)
@@ -84,7 +86,8 @@ private struct ComingSoonTabView: View {
 
 // MARK: - Barre d'onglets
 
-/// Barre blanche avec filet supérieur ; l'onglet actif a une capsule pleine derrière son icône.
+/// Barre de la maquette (80 pt, fond #F4F8FB, filet supérieur) : l'onglet actif a une capsule pleine
+/// de 54 × 36 derrière son icône. Comme dans la maquette, elle descend jusqu'au bas de l'écran.
 struct PawriseTabBar: View {
     @Binding var selection: AppTab
 
@@ -94,12 +97,11 @@ struct PawriseTabBar: View {
                 item(tab)
             }
         }
-        .padding(.top, 10)
-        .padding(.bottom, 6)
-        .padding(.horizontal, 4)
+        .padding(.horizontal, 8)
+        .padding(.top, 13)
+        .padding(.bottom, 13)
         .background {
-            Color.Pawrise.card
-                .ignoresSafeArea(edges: .bottom)
+            Color.Pawrise.page
                 .overlay(alignment: .top) {
                     Rectangle().fill(Color.Pawrise.border).frame(height: 1)
                 }
@@ -111,18 +113,13 @@ struct PawriseTabBar: View {
         return Button {
             selection = tab
         } label: {
-            VStack(spacing: 6) {
-                ZStack {
-                    Capsule()
-                        .fill(Color.Pawrise.primary)
-                        .frame(width: 54, height: 36)
-                        .opacity(isSelected ? 1 : 0)
-                    icon(for: tab)
-                        .foregroundStyle(isSelected ? Color.Pawrise.onPrimary : Color.Pawrise.textMuted)
-                }
-                .frame(height: 36)
+            VStack(spacing: 4) {
+                PawriseIcon(tab.glyph, size: 24)
+                    .foregroundStyle(isSelected ? Color.Pawrise.onPrimary : Color.Pawrise.textMuted)
+                    .frame(width: 54, height: 36)
+                    .background(Color.Pawrise.primary.opacity(isSelected ? 1 : 0), in: .capsule)
                 Text(tab.title)
-                    .font(.custom("Inter-Regular", size: 12, relativeTo: .caption2))
+                    .pawriseFont(.inter, 10, lineHeight: 1.4, relativeTo: .caption2)
                     .foregroundStyle(Color.Pawrise.textPrimary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
@@ -135,39 +132,17 @@ struct PawriseTabBar: View {
         .accessibilityAddTraits(isSelected ? [.isSelected, .isButton] : .isButton)
         .animation(.easeOut(duration: 0.2), value: isSelected)
     }
-
-    @ViewBuilder
-    private func icon(for tab: AppTab) -> some View {
-        if let symbol = tab.systemImage {
-            Image(systemName: symbol)
-                .font(.system(size: 19, weight: .regular))
-        } else {
-            PawriseFlower()
-                .frame(width: 22, height: 22)
-        }
-    }
 }
 
-/// Fleur du logo Pawrise (huit pétales autour d'un cœur évidé), utilisée pour l'onglet central.
-struct PawriseFlower: View {
-    var body: some View {
-        GeometryReader { proxy in
-            let side = min(proxy.size.width, proxy.size.height)
-            ZStack {
-                ForEach(0..<8, id: \.self) { index in
-                    Capsule()
-                        .frame(width: side * 0.3, height: side * 0.5)
-                        .offset(y: -side * 0.25)
-                        .rotationEffect(.degrees(Double(index) * 45))
-                }
-                Circle()
-                    .frame(width: side * 0.28, height: side * 0.28)
-                    .blendMode(.destinationOut)
-            }
-            .compositingGroup()
-            .frame(width: side, height: side)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+private extension AppTab {
+    /// Icônes du Figma (map, chat, brand, doc, settings).
+    var glyph: PawriseGlyph {
+        switch self {
+        case .location: .map
+        case .chat: .chat
+        case .health: .brand
+        case .appointments: .doc
+        case .settings: .settings
         }
-        .accessibilityHidden(true)
     }
 }

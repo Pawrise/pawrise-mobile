@@ -6,6 +6,7 @@ import Observation
 protocol DogRepository: Sendable {
     func loadDogs(ownerID: UUID) async throws -> [Dog]
     func saveDogs(_ dogs: [Dog], ownerID: UUID) async throws
+    func deleteDogs(ownerID: UUID) async throws
 }
 
 struct LocalDogRepository: DogRepository {
@@ -23,6 +24,12 @@ struct LocalDogRepository: DogRepository {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let file = directory.appending(path: "\(ownerID.uuidString).json")
         try JSONEncoder().encode(dogs).write(to: file, options: [.atomic, .completeFileProtection])
+    }
+
+    func deleteDogs(ownerID: UUID) async throws {
+        let file = directory.appending(path: "\(ownerID.uuidString).json")
+        guard FileManager.default.fileExists(atPath: file.path()) else { return }
+        try FileManager.default.removeItem(at: file)
     }
 }
 
@@ -75,6 +82,12 @@ final class DogStore {
     func selectNextDog() {
         guard dogs.count > 1, let current = selectedDog, let index = dogs.firstIndex(of: current) else { return }
         selectedDogID = dogs[(index + 1) % dogs.count].id
+    }
+
+    /// Compte supprimé : efface aussi les chiens enregistrés sur cet appareil.
+    func eraseAll(ownerID: UUID) async {
+        try? await repository.deleteDogs(ownerID: ownerID)
+        reset()
     }
 
     func reset() {

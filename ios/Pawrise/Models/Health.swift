@@ -56,6 +56,13 @@ struct HealthIndicator: Identifiable, Sendable {
     let message: String
     let detail: String
     let series: [HealthPeriod: [ChartPoint]]
+    /// État affiché dans la pastille de la feuille de détail quand il diffère de celui de la tuile
+    /// (maquette US-B · alerte : température en alerte, pastille « À surveiller »).
+    var badgeState: HealthState?
+    /// La feuille de détail propose « Demander à Pawrise » (maquette US-B · alerte).
+    var offersAssistant = false
+
+    var pillState: HealthState { badgeState ?? state }
 }
 
 /// Ce que l'écran Santé affiche pour un chien à un instant donné.

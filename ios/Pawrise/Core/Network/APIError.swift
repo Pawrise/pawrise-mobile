@@ -77,6 +77,7 @@ extension APIError: LocalizedError {
         case "PROVIDER_EMAIL_NOT_VERIFIED": "Votre adresse Google n'est pas vérifiée. Vérifiez-la chez Google ou utilisez un autre moyen de connexion."
         case "PROVIDER_NOT_CONFIGURED": "Ce moyen de connexion n'est pas encore disponible."
         case "INVALID_OR_EXPIRED_TOKEN": "Code incorrect ou expiré. Vérifiez-le ou demandez-en un nouveau."
+        case "CHIEF_TRANSFER_REQUIRED": "Vous êtes le propriétaire principal d'un chien partagé. Transférez d'abord ce rôle à un autre propriétaire, puis supprimez votre compte."
         case "VALIDATION_FAILED": "Certains champs sont invalides. Vérifiez le formulaire."
         default: nil
         }

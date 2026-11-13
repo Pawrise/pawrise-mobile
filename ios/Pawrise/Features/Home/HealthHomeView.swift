@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Onglet Pawrise · Santé (Figma 01 Homepage, états normal et anomalie).
+/// Onglet Pawrise · Santé (Figma US-B 01 Homepage, états normal et anomalie).
 struct HealthHomeView: View {
     @Environment(AppEnvironment.self) private var environment
     @Environment(DogStore.self) private var dogs
@@ -21,19 +21,21 @@ struct HealthHomeView: View {
         ScrollView {
             if let dog = dogs.selectedDog {
                 content(for: dog)
-                    .padding(.horizontal, Spacing.page)
-                    .padding(.vertical, 16)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 20)
+                    .padding(.bottom, 16)
             }
         }
         .scrollIndicators(.hidden)
         .pawrisePage()
         .task(id: currentKey) { await load() }
-        .sheet(item: $sheet) { sheet in
-            sheetContent(sheet)
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
-                .presentationCornerRadius(Radius.card)
-                .presentationBackground(Color.Pawrise.card)
+        // Panneau du bas de la maquette (fond assombri à 50 %, coins de 30 pt) : présenté sans l'animation
+        // système, le panneau gère lui-même son entrée et sa sortie.
+        .fullScreenCover(item: $sheet) { sheet in
+            HealthPanel(onDismissed: { present(nil) }) {
+                sheetContent(sheet)
+            }
+            .presentationBackground(.clear)
         }
     }
 
@@ -41,18 +43,32 @@ struct HealthHomeView: View {
         dogs.selectedDog.map { LoadKey(dogID: $0.id, scenario: environment.healthScenario, attempt: attempt) }
     }
 
+    /// Panneau d'un indicateur ouvert : le badge de l'en-tête prend l'état de cet indicateur
+    /// (maquette US-B · alerte : « Alerte » derrière le panneau Fibrillation atriale).
+    private func focusedState(in snapshot: HealthSnapshot) -> HealthState? {
+        guard case let .indicator(kind) = sheet else { return nil }
+        return snapshot.indicators.first { $0.kind == kind }?.pillState
+    }
+
+    private func present(_ newValue: HealthSheet?) {
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) { sheet = newValue }
+    }
+
     @ViewBuilder
     private func content(for dog: Dog) -> some View {
-        VStack(alignment: .leading, spacing: Spacing.section) {
+        VStack(alignment: .leading, spacing: 16) {
             if let snapshot, snapshotKey == currentKey {
                 HealthHeaderCard(
                     dog: dog,
                     snapshot: snapshot,
+                    badgeState: focusedState(in: snapshot),
                     canSwitchDog: dogs.dogs.count > 1,
                     onSwitchDog: { dogs.selectNextDog() },
                     onShowAnomaly: {
                         if let first = snapshot.indicators.first(where: { $0.state != .good }) {
-                            sheet = .indicator(first.kind)
+                            present(.indicator(first.kind))
                         }
                     }
                 )
@@ -76,33 +92,33 @@ struct HealthHomeView: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .firstTextBaseline) {
                 Text("INDICATEURS")
-                    .font(.custom("Inter-SemiBold", size: 13, relativeTo: .footnote))
+                    .pawriseFont(.inter, 13, .semibold, lineHeight: 1.4, relativeTo: .footnote)
                     .foregroundStyle(Color.Pawrise.textMuted)
                     .accessibilityAddTraits(.isHeader)
                 Spacer()
                 Text("Toucher pour le détail")
-                    .font(Font.Pawrise.caption)
+                    .pawriseFont(.inter, 11, lineHeight: 1.4, relativeTo: .caption)
                     .foregroundStyle(Color.Pawrise.textMuted)
                     .accessibilityHidden(true)
             }
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: 3), spacing: 16) {
                 ForEach(snapshot.indicators) { indicator in
                     HealthTile(
-                        systemImage: indicator.systemImage,
+                        glyph: indicator.kind.glyph,
                         headline: indicator.headline,
                         state: indicator.state,
                         accessibilityName: indicator.label
                     ) {
-                        sheet = .indicator(indicator.kind)
+                        present(.indicator(indicator.kind))
                     }
                 }
                 HealthTile(
-                    systemImage: CollarStatusSheet.batterySymbol(for: snapshot.batteryPercent),
+                    glyph: .battery,
                     headline: "\(snapshot.batteryPercent)%",
                     state: CollarStatusSheet.batteryState(for: snapshot.batteryPercent),
                     accessibilityName: "Batterie du collier"
                 ) {
-                    sheet = .collar
+                    present(.collar)
                 }
             }
         }
@@ -112,8 +128,8 @@ struct HealthHomeView: View {
     private func sheetContent(_ sheet: HealthSheet) -> some View {
         switch sheet {
         case let .indicator(kind):
-            if let indicator = snapshot?.indicators.first(where: { $0.kind == kind }) {
-                IndicatorDetailSheet(indicator: indicator)
+            if let indicator = snapshot?.indicators.first(where: { $0.kind == kind }), let dog = dogs.selectedDog {
+                IndicatorDetailSheet(indicator: indicator, dog: dog)
             }
         case .collar:
             if let dog = dogs.selectedDog {
@@ -153,11 +169,25 @@ private enum HealthSheet: Identifiable, Hashable {
     }
 }
 
-// MARK: - En-tête
+extension IndicatorKind {
+    /// Icône de la tuile (Figma : heart, pulse, activity, moon, thermometer).
+    var glyph: PawriseGlyph {
+        switch self {
+        case .heart: .heart
+        case .afib: .pulse
+        case .activity: .activity
+        case .sleep: .moon
+        case .temperature: .thermometer
+        }
+    }
+}
+
+// MARK: - En-tête (WellbeingScore)
 
 private struct HealthHeaderCard: View {
     let dog: Dog
     let snapshot: HealthSnapshot
+    var badgeState: HealthState?
     let canSwitchDog: Bool
     let onSwitchDog: () -> Void
     let onShowAnomaly: () -> Void
@@ -165,38 +195,42 @@ private struct HealthHeaderCard: View {
     private var state: HealthState { snapshot.state }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack {
-                if canSwitchDog {
-                    Button(action: onSwitchDog) {
-                        Image(systemName: "arrow.left.arrow.right")
-                            .font(.system(size: 18, weight: .medium))
-                            .foregroundStyle(Color.Pawrise.textMuted)
-                            .frame(width: 44, height: 44)
-                    }
-                    .accessibilityLabel("Changer de chien")
+                // Toujours affiché comme dans la maquette ; actif dès qu'il y a un deuxième chien.
+                Button {
+                    if canSwitchDog { onSwitchDog() }
+                } label: {
+                    PawriseIcon(.swap, size: 20)
+                        .foregroundStyle(Color.Pawrise.textMuted)
+                        .modifier(LargeHitArea())
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Changer de chien")
+                .accessibilityHidden(!canSwitchDog)
                 Spacer()
                 anomalyIcon
             }
-            .frame(minHeight: 44)
-            .padding(.horizontal, -10)
-            .padding(.top, -6)
+            .frame(height: 20)
 
-            HStack(alignment: .center, spacing: 16) {
+            HStack(alignment: .center, spacing: 12) {
                 DogAvatar(photo: dog.photo, size: 58)
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 3) {
                     Text(dog.name)
-                        .font(Font.Pawrise.title2)
+                        .pawriseFont(.display, 18, .bold, lineHeight: 1.4, relativeTo: .title3)
                         .foregroundStyle(Color.Pawrise.textPrimary)
                     if !dog.subtitle.isEmpty {
                         Text(dog.subtitle)
-                            .font(Font.Pawrise.subheadline)
+                            .pawriseFont(.inter, 11, lineHeight: 1.4, relativeTo: .caption)
                             .foregroundStyle(Color.Pawrise.textMuted)
                     }
-                    Text(state.label)
-                        .font(Font.Pawrise.subheadline)
-                        .foregroundStyle(Color.Pawrise.tint(for: state))
+                    let badge = badgeState ?? state
+                    Text(badge.label)
+                        .pawriseFont(.inter, 11, lineHeight: 1.4, relativeTo: .caption)
+                        .foregroundStyle(Color.Pawrise.tint(for: badge))
+                        .padding(.vertical, 4)
+                        .padding(.horizontal, 8)
+                        .background(Color.Pawrise.surface(for: badge), in: .capsule)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 ScoreRing(score: snapshot.score, state: state)
@@ -205,7 +239,7 @@ private struct HealthHeaderCard: View {
             .accessibilityValue("Score de bien-être \(snapshot.score) sur 100")
 
             Text(snapshot.summary)
-                .font(Font.Pawrise.subheadline)
+                .pawriseFont(.inter, 11, lineHeight: 1.4, relativeTo: .caption)
                 .foregroundStyle(Color.Pawrise.textPrimary)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -219,50 +253,54 @@ private struct HealthHeaderCard: View {
 
     @ViewBuilder
     private var anomalyIcon: some View {
-        let icon = Image(systemName: "exclamationmark.triangle")
-            .font(.system(size: 18, weight: .medium))
-            .frame(width: 44, height: 44)
         if snapshot.hasAnomaly {
             Button(action: onShowAnomaly) {
-                icon.foregroundStyle(Color.Pawrise.alert)
+                PawriseIcon(.alert, size: 20)
+                    .foregroundStyle(Color.Pawrise.alert)
+                    .modifier(LargeHitArea())
             }
+            .buttonStyle(.plain)
             .accessibilityLabel("Anomalie détectée, voir le détail")
         } else {
-            icon
+            PawriseIcon(.alert, size: 20)
                 .foregroundStyle(Color.Pawrise.textMuted)
+                .accessibilityElement(children: .ignore)
                 .accessibilityLabel("Aucune anomalie détectée")
         }
     }
 }
 
-/// Anneau du score de bien-être (0–100).
+/// Zone tactile de 44 pt autour d'une icône de 20 pt, sans changer la mise en page.
+private struct LargeHitArea: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .padding(12)
+            .contentShape(.rect)
+            .padding(-12)
+    }
+}
+
+/// Anneau du score de bien-être : cercle plein de 6 pt à la couleur de l'état (maquette).
 private struct ScoreRing: View {
     let score: Int
     let state: HealthState
-    var size: CGFloat = 72
 
     var body: some View {
         ZStack {
             Circle()
-                .stroke(Color.Pawrise.tint(for: state).opacity(0.15), lineWidth: 7)
-            Circle()
-                .trim(from: 0, to: CGFloat(min(max(score, 0), 100)) / 100)
-                .stroke(Color.Pawrise.tint(for: state), style: StrokeStyle(lineWidth: 7, lineCap: .round))
-                .rotationEffect(.degrees(-90))
+                .strokeBorder(Color.Pawrise.tint(for: state), lineWidth: 6)
             Text("\(score)")
-                .font(Font.Pawrise.display(28))
+                .pawriseFont(.mono, 28, lineHeight: 1.4, relativeTo: .title)
                 .foregroundStyle(Color.Pawrise.textPrimary)
-                .monospacedDigit()
         }
-        .frame(width: size, height: size)
-        .animation(.easeOut(duration: 0.4), value: score)
+        .frame(width: 72, height: 72)
     }
 }
 
 // MARK: - Tuile
 
 private struct HealthTile: View {
-    let systemImage: String
+    let glyph: PawriseGlyph
     let headline: String
     let state: HealthState
     let accessibilityName: String
@@ -270,20 +308,19 @@ private struct HealthTile: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 10) {
-                Image(systemName: systemImage)
-                    .font(.system(size: 22, weight: .regular))
+            VStack(spacing: 4) {
+                PawriseIcon(glyph, size: 28)
                 Text(headline)
-                    .font(.custom("Inter-SemiBold", size: 14, relativeTo: .subheadline))
+                    .pawriseFont(.inter, 11, .semibold, lineHeight: 1.4, relativeTo: .caption)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
                     .minimumScaleFactor(0.8)
             }
             .foregroundStyle(Color.Pawrise.tint(for: state))
-            .padding(8)
+            .padding(6)
             .frame(maxWidth: .infinity, minHeight: 108)
-            .background(Color.Pawrise.surface(for: state), in: .rect(cornerRadius: Radius.tile))
-            .contentShape(.rect(cornerRadius: Radius.tile))
+            .background(Color.Pawrise.surface(for: state), in: .rect(cornerRadius: 16))
+            .contentShape(.rect(cornerRadius: 16))
         }
         .buttonStyle(TilePressStyle())
         .accessibilityElement(children: .ignore)

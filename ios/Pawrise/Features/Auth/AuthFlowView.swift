@@ -29,34 +29,42 @@ struct AuthFlowView: View {
     }
 }
 
+/// Bienvenue (maquette A01) : bloc centré dans les 680 premiers points de l’écran, boutons à 680 et 748,
+/// marges latérales 24. Positions absolues : la maquette ne met rien sous la barre d’état.
 struct WelcomeView: View {
     let onLogin: () -> Void
     let onSignup: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
-            Spacer()
             VStack(spacing: 20) {
                 PawriseMark()
                 Text("Pawrise")
-                    .font(Font.Pawrise.display(34))
+                    .font(Font.Pawrise.display(32, relativeTo: .largeTitle))
                     .foregroundStyle(Color.Pawrise.textPrimary)
+                    .figmaLineHeight(1.35, size: 32, family: .display, relativeTo: .largeTitle)
+                    .accessibilityAddTraits(.isHeader)
                 Text("Le collier connecté qui suit la santé et la position de votre chien.")
                     .font(Font.Pawrise.body)
                     .foregroundStyle(Color.Pawrise.textMuted)
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, 24)
+                    .figmaLineHeight(1.35, size: 15)
+                    .frame(maxWidth: 288)
             }
-            Spacer()
+            .frame(maxWidth: .infinity)
+            .frame(maxHeight: 680)
+
             VStack(spacing: 12) {
                 Button("Se connecter", action: onLogin)
                     .buttonStyle(.pawrisePrimary)
                 Button("Créer un compte", action: onSignup)
                     .buttonStyle(.pawriseSecondary)
             }
+            .padding(.horizontal, 24)
+            .padding(.bottom, 40)
         }
-        .padding(.horizontal, Spacing.page)
-        .padding(.bottom, 16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+        .ignoresSafeArea(.container, edges: [.top, .bottom])
         .pawrisePage()
         .toolbar(.hidden, for: .navigationBar)
     }
@@ -82,12 +90,25 @@ struct LoginView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                AuthHeader(title: "Connexion", subtitle: "Retrouvez vos chiens et leur suivi.", onBack: { dismiss() })
+            // Maquette J02 : marges 24, écart 16, contenu à 48 pt du haut de l’écran (1 pt sous la zone sûre).
+            VStack(alignment: .leading, spacing: 16) {
+                Button { dismiss() } label: {
+                    HStack(spacing: 6) {
+                        Image("Onboarding/loginback").resizable().frame(width: 18, height: 18)
+                        Text("Retour")
+                            .font(Font.Pawrise.link)
+                            .foregroundStyle(Color.Pawrise.primary)
+                            .figmaLineHeight(1.35, size: 14, relativeTo: .subheadline)
+                    }
+                    .contentShape(Rectangle().inset(by: -12))
+                }
+                .buttonStyle(.plain)
+
+                AuthTitle(title: "Connexion", subtitle: "Retrouvez vos chiens et leur suivi.", subtitleSize: 14)
 
                 LabeledField(label: "E-mail") {
                     TextField("", text: $email, prompt: Text("vous@exemple.fr"))
-                        .textContentType(.username)
+                        .credentialContentType(.username)
                         .keyboardType(.emailAddress)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
@@ -97,14 +118,14 @@ struct LoginView: View {
                 }
                 LabeledField(label: "Mot de passe") {
                     SecureField("", text: $password)
-                        .textContentType(.password)
+                        .credentialContentType(.password)
                         .focused($focus, equals: .password)
                         .submitLabel(.go)
                         .onSubmit(submit)
                 }
 
                 Button("Mot de passe oublié ?") { onForgotPassword(email) }
-                    .buttonStyle(.pawriseLink)
+                    .buttonStyle(.pawriseCompactLink)
                     .frame(maxWidth: .infinity, alignment: .trailing)
 
                 if let errorMessage { ErrorBanner(message: errorMessage) }
@@ -114,12 +135,11 @@ struct LoginView: View {
                     .disabled(!canSubmit)
 
                 Button("Créer un compte", action: onSignupInstead)
-                    .buttonStyle(.pawriseLink)
+                    .buttonStyle(.pawriseCompactLink)
                     .frame(maxWidth: .infinity)
-
-                SocialSignInSection(errorMessage: $errorMessage)
             }
-            .padding(.horizontal, Spacing.page)
+            .padding(.horizontal, 24)
+            .padding(.top, 1)
             .padding(.bottom, 24)
         }
         .scrollDismissesKeyboard(.interactively)
@@ -190,7 +210,7 @@ struct SignupView: View {
     }
 
     private var termsError: String? {
-        acceptsTerms ? nil : "Acceptez les conditions d'utilisation pour continuer."
+        acceptsTerms ? nil : "Acceptez les conditions d’utilisation pour continuer."
     }
 
     private func error(_ local: String?, server field: String) -> String? {
@@ -198,75 +218,86 @@ struct SignupView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                AuthHeader(
-                    title: "Créer un compte",
-                    subtitle: "Quelques informations, puis on vous montre Pawrise.",
-                    onBack: { dismiss() }
-                )
+        VStack(spacing: 0) {
+            // Maquette A02 : en-tête « chevron seul » (rangée de 44 pt sous la zone sûre), puis contenu à 26 pt,
+            // marges 20, écart 24 entre la question et le formulaire, 12 entre les champs.
+            FlowHeader(onBack: { dismiss() })
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    AuthTitle(
+                        title: "Créer un compte",
+                        subtitle: "Quelques informations, puis on vous montre Pawrise.",
+                        subtitleSize: 13.5
+                    )
 
-                HStack(alignment: .top, spacing: 12) {
-                    LabeledField(label: "Prénom", error: error(firstNameError, server: "firstName")) {
-                        TextField("", text: $firstName, prompt: Text("Alex"))
-                            .textContentType(.givenName)
-                            .focused($focus, equals: .firstName)
-                            .submitLabel(.next)
-                            .onSubmit { focus = .lastName }
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack(alignment: .top, spacing: 12) {
+                            LabeledField(label: "Prénom", error: error(firstNameError, server: "firstName"), fieldFont: Self.fieldFont, borderColor: Color.Pawrise.borderStrong) {
+                                TextField("", text: $firstName, prompt: Text("Alex"))
+                                    .textContentType(.givenName)
+                                    .focused($focus, equals: .firstName)
+                                    .submitLabel(.next)
+                                    .onSubmit { focus = .lastName }
+                            }
+                            LabeledField(label: "Nom", error: error(lastNameError, server: "lastName"), fieldFont: Self.fieldFont, borderColor: Color.Pawrise.borderStrong) {
+                                TextField("", text: $lastName, prompt: Text("Martin"))
+                                    .textContentType(.familyName)
+                                    .focused($focus, equals: .lastName)
+                                    .submitLabel(.next)
+                                    .onSubmit { focus = .email }
+                            }
+                        }
+                        LabeledField(label: "E-mail", error: error(emailError, server: "email"), fieldFont: Self.fieldFont, borderColor: Color.Pawrise.borderStrong) {
+                            TextField("", text: $email, prompt: Text("alex@exemple.fr"))
+                                .credentialContentType(.emailAddress)
+                                .keyboardType(.emailAddress)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                                .focused($focus, equals: .email)
+                                .submitLabel(.next)
+                                .onSubmit { focus = .phone }
+                        }
+                        LabeledField(label: "Téléphone", error: error(phoneError, server: "phoneNumber"), fieldFont: Self.fieldFont, borderColor: Color.Pawrise.borderStrong) {
+                            TextField("", text: $phone)
+                                .textContentType(.telephoneNumber)
+                                .keyboardType(.phonePad)
+                                .focused($focus, equals: .phone)
+                                .accessibilityHint("Facultatif")
+                        }
+                        LabeledField(label: "Mot de passe", error: error(passwordError, server: "password"), fieldFont: Self.fieldFont, borderColor: Color.Pawrise.borderStrong) {
+                            SecureField("", text: $password, prompt: Text("8 caractères minimum"))
+                                .credentialContentType(.newPassword)
+                                .focused($focus, equals: .password)
+                                .submitLabel(.go)
+                                .onSubmit(submit)
+                        }
+
+                        TermsCheckbox(isOn: $acceptsTerms, error: error(termsError, server: "acceptedTermsVersion"))
+
+                        if let errorMessage { ErrorBanner(message: errorMessage) }
+
+                        Button("Continuer", action: submit)
+                            .buttonStyle(.pawrisePrimary(loading: isSubmitting))
+                            .disabled(isSubmitting)
+
+                        Button("J’ai déjà un compte", action: onLoginInstead)
+                            .buttonStyle(.pawriseCompactLink)
+                            .frame(maxWidth: .infinity)
                     }
-                    LabeledField(label: "Nom", error: error(lastNameError, server: "lastName")) {
-                        TextField("", text: $lastName, prompt: Text("Martin"))
-                            .textContentType(.familyName)
-                            .focused($focus, equals: .lastName)
-                            .submitLabel(.next)
-                            .onSubmit { focus = .email }
-                    }
                 }
-                LabeledField(label: "E-mail", error: error(emailError, server: "email")) {
-                    TextField("", text: $email, prompt: Text("alex@exemple.fr"))
-                        .textContentType(.emailAddress)
-                        .keyboardType(.emailAddress)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .focused($focus, equals: .email)
-                        .submitLabel(.next)
-                        .onSubmit { focus = .phone }
-                }
-                LabeledField(label: "Téléphone (facultatif)", error: error(phoneError, server: "phoneNumber")) {
-                    TextField("", text: $phone, prompt: Text("06 12 34 56 78"))
-                        .textContentType(.telephoneNumber)
-                        .keyboardType(.phonePad)
-                        .focused($focus, equals: .phone)
-                }
-                LabeledField(label: "Mot de passe", error: error(passwordError, server: "password")) {
-                    SecureField("", text: $password, prompt: Text("8 caractères minimum"))
-                        .textContentType(.newPassword)
-                        .focused($focus, equals: .password)
-                        .submitLabel(.go)
-                        .onSubmit(submit)
-                }
-
-                TermsCheckbox(isOn: $acceptsTerms, error: error(termsError, server: "acceptedTermsVersion"))
-
-                if let errorMessage { ErrorBanner(message: errorMessage) }
-
-                Button("Continuer", action: submit)
-                    .buttonStyle(.pawrisePrimary(loading: isSubmitting))
-                    .disabled(isSubmitting)
-
-                Button("J'ai déjà un compte", action: onLoginInstead)
-                    .buttonStyle(.pawriseLink)
-                    .frame(maxWidth: .infinity)
-
-                SocialSignInSection(errorMessage: $errorMessage)
+                .padding(.horizontal, 20)
+                .padding(.top, 26)
+                .padding(.bottom, 24)
             }
-            .padding(.horizontal, Spacing.page)
-            .padding(.bottom, 24)
+            .scrollDismissesKeyboard(.interactively)
+            .scrollIndicators(.hidden)
         }
-        .scrollDismissesKeyboard(.interactively)
         .pawrisePage()
         .toolbar(.hidden, for: .navigationBar)
     }
+
+    /// Saisie des champs d’inscription : Inter 17 (maquette A02).
+    private static let fieldFont = Font.Pawrise.inter(17)
 
     private func submit() {
         showErrors = true
@@ -298,6 +329,7 @@ struct SignupView: View {
 }
 
 /// Case à cocher des CGU (RG11) : obligatoire, enregistrée côté serveur avec la version acceptée.
+/// Style aligné sur la maquette : case 22 pt rayon 6 bordure #C1D4E0, texte Inter 13,5 secondaire.
 private struct TermsCheckbox: View {
     @Binding var isOn: Bool
     var error: String?
@@ -308,20 +340,30 @@ private struct TermsCheckbox: View {
                 isOn.toggle()
             } label: {
                 HStack(alignment: .top, spacing: 12) {
-                    Image(systemName: isOn ? "checkmark.square.fill" : "square")
-                        .font(.system(size: 22))
-                        .foregroundStyle(isOn ? Color.Pawrise.primary : (error == nil ? Color.Pawrise.borderStrong : Color.Pawrise.alert))
-                    Text("J'accepte les conditions d'utilisation et la politique de confidentialité de Pawrise.")
-                        .font(Font.Pawrise.subheadline)
-                        .foregroundStyle(Color.Pawrise.textPrimary)
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(isOn ? Color.Pawrise.primary : Color.Pawrise.card)
+                        RoundedRectangle(cornerRadius: 6)
+                            .strokeBorder(isOn ? Color.Pawrise.primary : (error == nil ? Color.Pawrise.borderStrong : Color.Pawrise.alert), lineWidth: 1)
+                        if isOn {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(Color.Pawrise.onPrimary)
+                        }
+                    }
+                    .frame(width: 22, height: 22)
+                    Text("J’accepte les conditions d’utilisation et la politique de confidentialité de Pawrise.")
+                        .font(Font.Pawrise.inter(13.5, relativeTo: .subheadline))
+                        .foregroundStyle(Color.Pawrise.textMuted)
                         .multilineTextAlignment(.leading)
+                        .figmaLineHeight(1.35, size: 13.5, relativeTo: .subheadline)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                 .contentShape(.rect)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("J'accepte les conditions d'utilisation et la politique de confidentialité")
+            .accessibilityLabel("J’accepte les conditions d’utilisation et la politique de confidentialité")
             .accessibilityValue(isOn ? "Coché" : "Non coché")
             .accessibilityAddTraits(.isToggle)
             .accessibilityIdentifier("terms-checkbox")
@@ -367,7 +409,7 @@ struct ForgotPasswordView: View {
 
                 LabeledField(label: "E-mail") {
                     TextField("", text: $email, prompt: Text("vous@exemple.fr"))
-                        .textContentType(.username)
+                        .credentialContentType(.username)
                         .keyboardType(.emailAddress)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
@@ -385,7 +427,7 @@ struct ForgotPasswordView: View {
                     }
                     LabeledField(label: "Nouveau mot de passe") {
                         SecureField("", text: $newPassword, prompt: Text("8 caractères minimum"))
-                            .textContentType(.newPassword)
+                            .credentialContentType(.newPassword)
                             .focused($focus, equals: .password)
                             .submitLabel(.go)
                             .onSubmit(submit)
@@ -462,6 +504,31 @@ struct ForgotPasswordView: View {
 }
 
 // MARK: - Éléments partagés
+
+/// Titre d’écran Bricolage 700 26 (135 %) + sous-titre Inter 400 (135 %), écart 8 (maquette « Question »).
+private struct AuthTitle: View {
+    let title: String
+    let subtitle: String
+    var subtitleSize: CGFloat = 14
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(Font.Pawrise.largeTitle)
+                .foregroundStyle(Color.Pawrise.textPrimary)
+                .figmaLineHeight(1.35, size: 26, family: .display, relativeTo: .largeTitle)
+                .accessibilityAddTraits(.isHeader)
+            Text(subtitle)
+                .font(Font.Pawrise.inter(subtitleSize, relativeTo: .subheadline))
+                // Figma rend Inter 13,5 environ 2 % plus serré que iOS (mesuré).
+                .tracking(subtitleSize == 13.5 ? -0.12 : 0)
+                .foregroundStyle(Color.Pawrise.textMuted)
+                .figmaLineHeight(1.35, size: subtitleSize, relativeTo: .subheadline)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
 
 private struct AuthHeader: View {
     let title: String

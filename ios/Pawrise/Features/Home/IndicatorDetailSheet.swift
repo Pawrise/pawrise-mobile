@@ -1,85 +1,100 @@
 import SwiftUI
 
-/// Feuille de détail d'un indicateur (Figma 02 à 06, états normal et anomalie).
+/// Panneau de détail d'un indicateur (Figma US-B 02 à 06, états normal et anomalie).
 struct IndicatorDetailSheet: View {
     let indicator: HealthIndicator
+    let dog: Dog
     @State private var period: HealthPeriod = .today
 
+    @Environment(AppEnvironment.self) private var environment
+    @Environment(TabRouter.self) private var router
+    @Environment(ChatConversations.self) private var conversations
+    @Environment(\.closeHealthPanel) private var close
+
+    private var tint: Color { Color.Pawrise.tint(for: indicator.state) }
+
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                HealthSheetHeader(title: indicator.label, closeTint: indicator.state == .alert ? Color.Pawrise.alert : Color.Pawrise.textMuted)
+        VStack(alignment: .leading, spacing: 16) {
+            HealthSheetHeader(
+                title: indicator.label,
+                closeTint: indicator.pillState == .good ? Color.Pawrise.textMuted : Color.Pawrise.tint(for: indicator.pillState)
+            )
 
-                HStack(alignment: .center, spacing: 16) {
-                    StatePill(state: indicator.state)
-                    Text(indicator.headline)
-                        .font(Font.Pawrise.mono(26))
-                        .foregroundStyle(indicator.state == .good ? Color.Pawrise.textPrimary : Color.Pawrise.tint(for: indicator.state))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.6)
-                }
-                .accessibilityElement(children: .combine)
-
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(indicator.message)
-                        .font(Font.Pawrise.body)
-                        .foregroundStyle(Color.Pawrise.textPrimary)
-                    Text(indicator.detail)
-                        .font(Font.Pawrise.callout)
-                        .foregroundStyle(Color.Pawrise.textMuted)
-                }
-                .fixedSize(horizontal: false, vertical: true)
-
-                if indicator.hasPeriods {
-                    PeriodSelector(selection: $period)
-                }
-
-                IndicatorChart(indicator: indicator, period: indicator.hasPeriods ? period : .today)
-                    .padding(16)
-                    .frame(maxWidth: .infinity)
-                    .background(Color.Pawrise.mutedSurface, in: .rect(cornerRadius: 24))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 24).strokeBorder(Color.Pawrise.border, lineWidth: 1)
-                    }
-                    .animation(.easeInOut(duration: 0.25), value: period)
+            HStack(alignment: .center, spacing: 10) {
+                StateBadge(state: indicator.pillState)
+                Text(indicator.headline)
+                    .pawriseFont(.mono, 20, lineHeight: 1.35, relativeTo: .title3)
+                    .foregroundStyle(indicator.state == .good ? Color.Pawrise.textPrimary : tint)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(.horizontal, Spacing.page)
-            .padding(.top, 24)
-            .padding(.bottom, 32)
+            .accessibilityElement(children: .combine)
+
+            // Coupure de lignes identique à la maquette (pas d'anti-orphelin iOS).
+            VStack(alignment: .leading, spacing: 6) {
+                MaquetteText(text: indicator.message, size: 14, lineHeight: 1.35, color: Color.Pawrise.textPrimary, relativeTo: .subheadline)
+                MaquetteText(text: indicator.detail, size: 13, lineHeight: 1.35, color: Color.Pawrise.textMuted, relativeTo: .footnote)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            if indicator.hasPeriods {
+                PeriodSelector(selection: $period)
+            }
+
+            // Figma : filet extérieur, d'où 13 pt entre le bord et le contenu (cartes de 200 / 176 / 75 pt).
+            IndicatorChart(indicator: indicator, period: indicator.hasPeriods ? period : .today)
+                .padding(13)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.Pawrise.page, in: .rect(cornerRadius: 24))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 24).strokeBorder(Color.Pawrise.border, lineWidth: 1)
+                }
+                .animation(.easeInOut(duration: 0.25), value: period)
+
+            if indicator.offersAssistant {
+                Button(action: askPawrise) {
+                    Text("✦  Demander à Pawrise")
+                        .pawriseFont(.inter, 15, .bold, relativeTo: .headline)
+                        .foregroundStyle(Color.Pawrise.onPrimary)
+                        .frame(maxWidth: .infinity, minHeight: 56)
+                        .background(Color.Pawrise.primary, in: .rect(cornerRadius: 16))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Demander à Pawrise")
+                .accessibilityHint("Ouvre le Chat IA avec une question sur cette mesure")
+            }
         }
-        .scrollIndicators(.hidden)
+    }
+
+    /// Ouvre le Chat IA et pose la question sur l'indicateur concerné.
+    private func askPawrise() {
+        let question = "\(indicator.message) Que dois-je faire ?"
+        conversations.conversation(for: dog, environment: environment).send(question)
+        router.open(.chat)
+        close()
     }
 }
 
-/// Titre de feuille + bouton de fermeture rond (✕).
-struct HealthSheetHeader: View {
-    let title: String
-    var closeTint: Color = Color.Pawrise.textMuted
-    @Environment(\.dismiss) private var dismiss
+/// Pastille d'état du panneau (120 × 28, rayon 14) : coche et libellé à la couleur de l'état,
+/// fond vert clair dans tous les états comme dans la maquette.
+private struct StateBadge: View {
+    let state: HealthState
 
     var body: some View {
-        HStack(alignment: .center) {
-            Text(title)
-                .font(Font.Pawrise.title)
-                .foregroundStyle(Color.Pawrise.textPrimary)
-                .accessibilityAddTraits(.isHeader)
-            Spacer()
-            Button {
-                dismiss()
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(closeTint)
-                    .frame(width: 40, height: 40)
-                    .background(Color.Pawrise.elevated, in: .circle)
-                    .frame(width: 44, height: 44)
-            }
-            .accessibilityLabel("Fermer")
+        HStack(spacing: 5) {
+            PawriseIcon(.check, size: 14)
+            Text(state.label)
+                .pawriseFont(.inter, 12, .semibold, lineHeight: 1.35, relativeTo: .caption)
+                .lineLimit(1)
         }
+        .foregroundStyle(Color.Pawrise.tint(for: state))
+        .frame(width: 120, height: 28)
+        .background(Color.Pawrise.goodSurface, in: .capsule)
     }
 }
 
-/// Sélecteur « Aujourd'hui / 7 jours / 30 jours » en capsules (le segment actif est plein).
+/// Sélecteur « Aujourd'hui / 7 jours / 30 jours » (segment actif plein, fond #F4F8FB).
 private struct PeriodSelector: View {
     @Binding var selection: HealthPeriod
     @Namespace private var namespace
@@ -92,9 +107,9 @@ private struct PeriodSelector: View {
                     withAnimation(.snappy(duration: 0.25)) { selection = period }
                 } label: {
                     Text(period.label)
-                        .font(.custom("Inter-SemiBold", size: 15, relativeTo: .subheadline))
+                        .pawriseFont(.inter, 12, .semibold, lineHeight: 1.35, relativeTo: .caption)
                         .foregroundStyle(isSelected ? Color.Pawrise.onPrimary : Color.Pawrise.textMuted)
-                        .frame(maxWidth: .infinity, minHeight: 40)
+                        .frame(maxWidth: .infinity, minHeight: 32)
                         .background {
                             if isSelected {
                                 Capsule()
@@ -109,6 +124,6 @@ private struct PeriodSelector: View {
             }
         }
         .padding(4)
-        .background(Color.Pawrise.mutedSurface, in: .capsule)
+        .background(Color.Pawrise.page, in: .capsule)
     }
 }

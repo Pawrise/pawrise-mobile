@@ -79,6 +79,23 @@ struct ResetPasswordRequest: Encodable, Sendable {
     let newPassword: String
 }
 
+/// S17 Confidentialité : les trois interrupteurs de `GET/PATCH /v1/me/preferences` (D6).
+struct Preferences: Codable, Sendable, Equatable {
+    var deviceLocationSharing: Bool
+    var healthNotifications: Bool
+    var anonymizedDataSharing: Bool
+
+    /// Valeurs d'un compte neuf côté serveur.
+    static let defaults = Preferences(deviceLocationSharing: true, healthNotifications: true, anonymizedDataSharing: false)
+}
+
+/// PATCH : seuls les champs non nil sont envoyés (convention 9 : absent = inchangé).
+struct PreferencesUpdate: Encodable, Sendable, Equatable {
+    var deviceLocationSharing: Bool?
+    var healthNotifications: Bool?
+    var anonymizedDataSharing: Bool?
+}
+
 /// Version des CGU affichées dans l'app ; le serveur n'accepte que celle en vigueur (RG11, E12).
 enum LegalTerms {
     static let version = "2026-10"

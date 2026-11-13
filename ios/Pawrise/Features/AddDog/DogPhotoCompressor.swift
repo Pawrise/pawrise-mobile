@@ -5,7 +5,7 @@ enum DogPhotoCompressor {
     static let maxBytes = 300_000
     static let maxDimension: CGFloat = 1024
 
-    /// Redimensionne (côté max 1024 px) puis baisse la qualité jusqu'à passer sous ~300 Ko.
+    /// Redimensionne (côté max 1024 px) puis baisse la qualité jusqu’à passer sous ~300 Ko.
     static func jpeg(from data: Data, maxBytes: Int = maxBytes) -> Data? {
         guard let image = UIImage(data: data) else { return nil }
         var dimension = maxDimension

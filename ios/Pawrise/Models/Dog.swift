@@ -86,7 +86,8 @@ enum DogCatalog {
             weightKg: 28,
             heightCm: 55,
             medicalNotes: nil,
-            photo: .remote(URL(string: "https://images.unsplash.com/photo-1693615775129-f2004d6e3e0b?crop=entropy&fit=crop&fm=jpg&w=320&h=320&q=80")!),
+            // Même photo que la maquette (Golden Retriever assis dans l'herbe, 1re photo d'exemple).
+            photo: .remote(samplePhotos[0]),
             collar: Collar(code: "PW-ABC123", model: "Pawrise Collar C2", batteryPercent: 100, signal: .strong, connected: true)
         )
     }

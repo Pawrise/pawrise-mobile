@@ -36,6 +36,12 @@ final class ChatViewModel {
 
     static let interruptedMessage = "La réponse a été interrompue."
 
+    /// Délai minimal avant d'afficher une réponse, en secondes (argument de lancement
+    /// `-PawriseAssistantMinimumDelay`, utilisé par les captures d'écran ; 0 en usage normal).
+    static var minimumResponseDelay: Double {
+        UserDefaults.standard.double(forKey: "PawriseAssistantMinimumDelay")
+    }
+
     private let service: any AssistantService
     private let petRef: String
     @ObservationIgnored private var turnTask: Task<Void, Never>?
@@ -118,6 +124,7 @@ final class ChatViewModel {
     private func consume(_ request: AssistantTurnRequest) async {
         var receivedResponse = false
         var errorText: String?
+        let started = ContinuousClock.now
         do {
             for try await event in service.streamTurn(request) {
                 guard activeTurnID == request.turnId else { return }
@@ -125,6 +132,10 @@ final class ChatViewModel {
                 case let .status(text):
                     statusText = text
                 case let .response(response):
+                    // Captures d'écran : laisse l'indicateur de saisie visible un minimum de temps (0 par défaut).
+                    let hold = Duration.seconds(Self.minimumResponseDelay) - (ContinuousClock.now - started)
+                    if hold > .zero { try await Task.sleep(for: hold) }
+                    guard activeTurnID == request.turnId else { return }
                     messages.append(ChatMessage(role: .assistant, text: response.responseText, response: response))
                     receivedResponse = true
                 }

@@ -1,19 +1,21 @@
 import SwiftUI
 
 /// Profil du chien (Figma 08 à 16) puis association du collier (Figma 17 à 20).
-/// Le chien n'est ajouté au compte qu'à la toute fin, ce qui bascule `RootView` sur les onglets.
+/// Le chien n’est ajouté au compte qu’à la toute fin, ce qui bascule `RootView` sur les onglets.
 struct AddDogFlowView: View {
     let onFinish: () -> Void
     let onClose: () -> Void
 
     @Environment(AppEnvironment.self) private var environment
     @State private var model = AddDogFlowModel()
+    /// Activation en cours, annulée si l’utilisateur revient en arrière (A19).
+    @State private var activation: Task<Void, Never>?
 
     var body: some View {
+        // Maquette A08–A20 : en-tête (rangée de 44 pt sous la zone sûre), contenu, zone d’action de 80 pt
+        // en bas de l’écran (bouton à 16 pt du bord, sous la zone sûre comme dans la maquette).
         VStack(spacing: 0) {
             header
-                .padding(.horizontal, 8)
-                .padding(.top, 4)
 
             content
                 .id(contentID)
@@ -25,6 +27,7 @@ struct AddDogFlowView: View {
 
             footer
         }
+        .ignoresSafeArea(.container, edges: .bottom)
         .animation(.easeOut(duration: 0.25), value: contentID)
         .pawrisePage()
     }
@@ -37,18 +40,30 @@ struct AddDogFlowView: View {
 
     private var header: some View {
         FlowHeader(
-            onBack: model.canGoBack ? { model.goBack() } : nil,
+            onBack: backAction,
             onClose: onClose
         ) {
             if model.phase == .profile {
                 StepProgressBar(total: AddDogFlowModel.Step.allCases.count, current: model.step.number)
             } else {
                 Text("Collier Pawrise")
-                    .font(Font.Pawrise.footnote)
-                    .foregroundStyle(Color.Pawrise.textPrimary)
+                    .font(Font.Pawrise.inter(13, .semibold, relativeTo: .footnote))
+                    .foregroundStyle(Color.Pawrise.textMuted)
+                    .figmaLineHeight(1.35, size: 13, relativeTo: .footnote)
                     .accessibilityAddTraits(.isHeader)
             }
         }
+    }
+
+    /// Retour : étape précédente ; depuis la photo (première étape), retour à la découverte comme la croix.
+    private var backAction: (() -> Void)? {
+        if model.canGoBack {
+            return {
+                if model.phase == .activating { activation?.cancel() }
+                model.goBack()
+            }
+        }
+        return model.phase == .profile ? onClose : nil
     }
 
     // MARK: Contenu
@@ -97,19 +112,21 @@ struct AddDogFlowView: View {
                     .buttonStyle(.pawrisePrimary(loading: model.isSaving))
                     .disabled(model.isSaving)
             case .collarIntro, .scan, .activating:
-                EmptyView()
+                // Zone d’action vide mais réservée (80 pt), comme le cadre « Action principale » de la maquette.
+                Color.clear.frame(height: 56)
             }
         }
-        .padding(.horizontal, Spacing.page)
-        .padding(.top, 12)
+        .padding(.horizontal, 20)
+        .padding(.top, 8)
         .padding(.bottom, 16)
+        .frame(minHeight: 80, alignment: .top)
     }
 
     // MARK: Actions
 
     private func activate(_ code: String) {
         let existing = Set(environment.dogs.dogs.compactMap { $0.collar.map { Collar.normalize($0.code) } })
-        Task { await model.activate(code: code, using: environment.collars, existingCodes: existing) }
+        activation = Task { await model.activate(code: code, using: environment.collars, existingCodes: existing) }
     }
 
     private func finish() {
@@ -121,22 +138,21 @@ struct AddDogFlowView: View {
     }
 }
 
-/// Titre de question + aide, alignés à gauche comme dans le Figma.
+/// Titre de question + aide (maquette « Question ») : Bricolage 700 26 et Inter 400 13,5, interligne 135 %, écart 8.
 struct FlowQuestion: View {
     let title: String
     var hint: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(Font.Pawrise.display(26, relativeTo: .title))
-                .foregroundStyle(Color.Pawrise.textPrimary)
-                .fixedSize(horizontal: false, vertical: true)
-                .accessibilityAddTraits(.isHeader)
+            FigmaText.display(title, size: 26)
             if let hint {
                 Text(hint)
-                    .font(Font.Pawrise.subheadline)
+                    .font(Font.Pawrise.inter(13.5, relativeTo: .subheadline))
+                    // Figma rend Inter 13,5 environ 2 % plus serré que iOS (mesuré) : mêmes coupures de ligne.
+                    .tracking(-0.12)
                     .foregroundStyle(Color.Pawrise.textMuted)
+                    .figmaLineHeight(1.35, size: 13.5, relativeTo: .subheadline)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -144,17 +160,25 @@ struct FlowQuestion: View {
     }
 }
 
+extension Font.Pawrise {
+    /// Saisie des champs du parcours : Inter 400 17.
+    static let flowField = inter(17)
+}
+
 extension View {
-    /// Cadre de saisie blanc arrondi (même rendu que `LabeledField`, sans libellé).
-    func pawriseFieldBox(isInvalid: Bool = false) -> some View {
-        font(Font.Pawrise.body)
+    /// Cadre de saisie du parcours (maquette « Champ ») : 56 pt, rayon 16, bordure #C1D4E0, Inter 17, marges 16.
+    func pawriseFieldBox(isInvalid: Bool = false, isSelected: Bool = false) -> some View {
+        font(Font.Pawrise.flowField)
             .foregroundStyle(Color.Pawrise.textPrimary)
             .padding(.horizontal, 16)
-            .frame(minHeight: 54)
-            .background(Color.Pawrise.card, in: .rect(cornerRadius: Radius.control))
+            .frame(minHeight: 56)
+            .background(isSelected ? Color.Pawrise.elevated : Color.Pawrise.card, in: .rect(cornerRadius: Radius.control))
             .overlay {
                 RoundedRectangle(cornerRadius: Radius.control)
-                    .strokeBorder(isInvalid ? Color.Pawrise.alert : Color.Pawrise.border, lineWidth: 1)
+                    .strokeBorder(
+                        isInvalid ? Color.Pawrise.alert : (isSelected ? Color.Pawrise.primary : Color.Pawrise.borderStrong),
+                        lineWidth: 1
+                    )
             }
     }
 }

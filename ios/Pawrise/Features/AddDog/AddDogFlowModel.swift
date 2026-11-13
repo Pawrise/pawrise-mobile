@@ -29,14 +29,19 @@ final class AddDogFlowModel {
 
     private(set) var step: Step = .photo
     private(set) var phase: Phase = .profile
-    /// Vrai quand l'utilisateur modifie une valeur depuis le récapitulatif : « Suivant » y ramène.
+    /// Vrai quand l’utilisateur modifie une valeur depuis le récapitulatif : « Suivant » y ramène.
     private(set) var isEditingFromSummary = false
 
     // MARK: Profil
 
     var photo: Dog.Photo?
     var name = ""
+    /// Date de naissance, déduite de la saisie « JJ / MM / AAAA » (`birthDateText`).
     var birthDate: Date?
+    /// Saisie de la date de naissance au format de la maquette A10 : « 12 / 04 / 2023 ».
+    var birthDateText = "" {
+        didSet { birthDate = Self.parseBirthDate(birthDateText, calendar: calendar) }
+    }
     var sex: Dog.Sex?
     /// Texte saisi dans le champ de recherche de race.
     var breedQuery = ""
@@ -100,8 +105,14 @@ final class AddDogFlowModel {
     var isNameValid: Bool { !trimmedName.isEmpty && trimmedName.count <= Self.nameMaxLength }
 
     var isBirthDateValid: Bool {
-        guard let birthDate else { return true }
+        if birthDateText.isEmpty { return true }
+        guard let birthDate else { return false }
         return birthDateRange.contains(birthDate)
+    }
+
+    /// Vrai quand la date est entièrement saisie mais impossible ou hors de la plage acceptée.
+    var showsBirthDateError: Bool {
+        birthDateText.filter(\.isNumber).count == 8 && !isBirthDateValid
     }
 
     var isWeightValid: Bool {
@@ -155,8 +166,7 @@ final class AddDogFlowModel {
     var canGoBack: Bool {
         switch phase {
         case .profile: step != .photo
-        case .collarIntro, .scan, .manual: true
-        case .activating, .success: false
+        case .collarIntro, .scan, .manual, .activating, .success: true
         }
     }
 
@@ -177,7 +187,11 @@ final class AddDogFlowModel {
             failedCollarCode = nil
             phase = .collarIntro
         case .activating, .success:
-            break
+            // A19 : annule l’activation ; A20 : le collier activé est oublié. Retour à « Associer le collier ».
+            collar = nil
+            collarError = nil
+            failedCollarCode = nil
+            phase = .collarIntro
         }
     }
 
@@ -185,7 +199,7 @@ final class AddDogFlowModel {
         selectedBreed = breed
     }
 
-    /// Appelé quand l'utilisateur modifie le texte : la sélection précédente ne correspond plus.
+    /// Appelé quand l’utilisateur modifie le texte : la sélection précédente ne correspond plus.
     func breedQueryDidChange() {
         if let selectedBreed, selectedBreed != breedQuery {
             self.selectedBreed = nil
@@ -204,14 +218,14 @@ final class AddDogFlowModel {
         phase = .manual
     }
 
-    /// Efface l'erreur dès que l'utilisateur saisit un autre code que celui refusé.
+    /// Efface l’erreur dès que l’utilisateur saisit un autre code que celui refusé.
     func collarCodeDidChange() {
         guard Collar.normalize(collarCode) != failedCollarCode else { return }
         collarError = nil
         failedCollarCode = nil
     }
 
-    /// Lance l'activation. En cas d'échec, retour à la saisie manuelle avec le code prérempli.
+    /// Lance l’activation. En cas d’échec, retour à la saisie manuelle avec le code prérempli.
     func activate(code rawCode: String, using service: CollarService, existingCodes: Set<String>) async {
         guard phase != .activating else { return }
         let code = Collar.normalize(rawCode)
@@ -228,18 +242,22 @@ final class AddDogFlowModel {
         failedCollarCode = nil
         phase = .activating
         do {
-            collar = try await service.activate(code: code, for: displayName)
+            let activated = try await service.activate(code: code, for: displayName)
+            // L’utilisateur a pu revenir en arrière pendant l’activation : résultat ignoré.
+            guard phase == .activating else { return }
+            collar = activated
             phase = .success
         } catch is CancellationError {
-            phase = .manual
+            if phase == .activating { phase = .manual }
         } catch {
+            guard phase == .activating else { return }
             fail(with: error)
         }
     }
 
     private func fail(with error: Error) {
         collarError = (error as? LocalizedError)?.errorDescription
-            ?? "L'activation a échoué. Vérifiez votre connexion puis réessayez."
+            ?? "L’activation a échoué. Vérifiez votre connexion puis réessayez."
         failedCollarCode = Collar.normalize(collarCode)
         phase = .manual
     }
@@ -273,7 +291,7 @@ final class AddDogFlowModel {
             try await store.add(dog)
             return true
         } catch {
-            saveError = "Le profil n'a pas pu être enregistré. Réessayez."
+            saveError = "Le profil n’a pas pu être enregistré. Réessayez."
             return false
         }
     }
@@ -307,6 +325,31 @@ final class AddDogFlowModel {
             }
         }
         return String(result.prefix(5))
+    }
+
+    /// Garde 8 chiffres au plus et les présente « JJ / MM / AAAA » au fil de la saisie.
+    static func formatBirthDateInput(_ text: String) -> String {
+        let digits = Array(text.filter { $0.isASCII && $0.isNumber }.prefix(8))
+        var result = ""
+        for (index, digit) in digits.enumerated() {
+            if index == 2 || index == 4 { result += " / " }
+            result.append(digit)
+        }
+        return result
+    }
+
+    /// « 12 / 04 / 2023 » → 12 avril 2023 ; nil si incomplète ou impossible (31 / 02…).
+    static func parseBirthDate(_ text: String, calendar: Calendar) -> Date? {
+        let digits = text.filter { $0.isASCII && $0.isNumber }
+        guard digits.count == 8,
+              let day = Int(digits.prefix(2)),
+              let month = Int(digits.dropFirst(2).prefix(2)),
+              let year = Int(digits.suffix(4)) else { return nil }
+        let components = DateComponents(year: year, month: month, day: day)
+        guard let date = calendar.date(from: components) else { return nil }
+        let check = calendar.dateComponents([.year, .month, .day], from: date)
+        guard check.year == year, check.month == month, check.day == day else { return nil }
+        return date
     }
 
     static func sanitizeIntegerInput(_ text: String) -> String {

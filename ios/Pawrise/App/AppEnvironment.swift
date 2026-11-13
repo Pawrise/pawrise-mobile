@@ -51,6 +51,21 @@ final class AppEnvironment {
 
     func logout() async {
         await session.logout()
+        resetAfterSignOut()
+    }
+
+    /// S25 : le compte est supprimé côté serveur, puis tout ce que l'app garde sur cet appareil est effacé.
+    func deleteAccount() async throws {
+        let userID = session.user?.id
+        try await session.deleteAccount()
+        if let userID {
+            onboarding.setLearnFlowSeen(false, for: userID)
+            await dogs.eraseAll(ownerID: userID)
+        }
+        resetAfterSignOut()
+    }
+
+    private func resetAfterSignOut() {
         dogs.reset()
         healthScenario = .normal
     }

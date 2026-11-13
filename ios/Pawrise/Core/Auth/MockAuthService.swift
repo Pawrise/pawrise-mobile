@@ -15,6 +15,7 @@ actor MockAuthService: AuthService {
     private var sessions: [String: UUID] = [:] // refresh token -> user id
     private var failures: [String: Int] = [:]
     private var pendingResets: Set<String> = []
+    private var preferencesByUser: [UUID: Preferences] = [:]
     private let latency: Duration
 
     static let demoEmail = "demo@pawrise.fr"
@@ -118,6 +119,34 @@ actor MockAuthService: AuthService {
 
     func resendVerificationEmail() async throws {
         try await Task.sleep(for: latency)
+    }
+
+    func preferences() async throws -> Preferences {
+        try await Task.sleep(for: latency)
+        let user = try await currentUser()
+        return preferencesByUser[user.id] ?? .defaults
+    }
+
+    func updatePreferences(_ update: PreferencesUpdate) async throws -> Preferences {
+        try await Task.sleep(for: latency)
+        guard update != PreferencesUpdate() else { throw APIError.problem(400, "VALIDATION_FAILED", fields: []) }
+        let user = try await currentUser()
+        var preferences = preferencesByUser[user.id] ?? .defaults
+        if let value = update.deviceLocationSharing { preferences.deviceLocationSharing = value }
+        if let value = update.healthNotifications { preferences.healthNotifications = value }
+        if let value = update.anonymizedDataSharing { preferences.anonymizedDataSharing = value }
+        preferencesByUser[user.id] = preferences
+        return preferences
+    }
+
+    func deleteAccount() async throws {
+        try await Task.sleep(for: latency)
+        let user = try await currentUser()
+        accounts = accounts.filter { $0.value.user.id != user.id }
+        sessions = sessions.filter { $0.value != user.id }
+        preferencesByUser[user.id] = nil
+        failures[user.email] = nil
+        pendingResets.remove(user.email)
     }
 
     // MARK: - Helpers

@@ -101,6 +101,20 @@ final class SessionStore {
         phase = .signedIn(fresh)
     }
 
+    func preferences() async throws -> Preferences {
+        try await auth.preferences()
+    }
+
+    func updatePreferences(_ update: PreferencesUpdate) async throws -> Preferences {
+        try await auth.updatePreferences(update)
+    }
+
+    /// Supprime le compte sur le serveur puis efface la session locale. En cas d'erreur, rien n'est effacé.
+    func deleteAccount() async throws {
+        try await auth.deleteAccount()
+        await clearLocalSession()
+    }
+
     func logout() async {
         if let refresh = await tokens.tokens?.refreshToken {
             try? await auth.logout(refreshToken: refresh)

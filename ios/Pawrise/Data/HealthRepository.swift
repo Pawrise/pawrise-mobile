@@ -38,7 +38,8 @@ struct SeedHealthRepository: HealthRepository {
                 ? "Le rythme cardiaque de \(name) est inhabituellement élevé depuis 45 minutes."
                 : "Le rythme cardiaque de \(name) est dans ses valeurs habituelles.",
             detail: anomaly
-                ? "Pic soutenu autour de 128 bpm alors que \(name) est au repos, au-dessus de sa plage habituelle (60–100 bpm)."
+                // Textes de la maquette (US-B · alerte, écran 02).
+                ? "Moyenne de 128 bpm sur la journée, avec des variations normales pendant le repos et l'activité."
                 : "Moyenne de 78 bpm sur la journée, avec des variations normales pendant le repos et l'activité.",
             series: anomaly
                 ? [
@@ -50,7 +51,8 @@ struct SeedHealthRepository: HealthRepository {
                     .today: points(Self.hours(6, 18), Self.wave(78, 9, 18, seed: 2)),
                     .week: points(Self.days7, Self.wave(78, 5, 7, seed: 3)),
                     .month: points(Self.days30, Self.wave(78, 6, 30, seed: 1)),
-                ]
+                ],
+            offersAssistant: anomaly
         )
     }
 
@@ -99,7 +101,8 @@ struct SeedHealthRepository: HealthRepository {
                     .today: points(Self.hours(6, 12, step: 1.5), [4, 22, 12, 8, 6, 18, 10, 6, 4, 14, 20, 8]),
                     .week: points(Self.days7, [88, 102, 76, 94, 110, 130, 96]),
                     .month: points(Self.days30, Self.wave(95, 20, 30, seed: 5)),
-                ]
+                ],
+            offersAssistant: anomaly
         )
     }
 
@@ -111,14 +114,16 @@ struct SeedHealthRepository: HealthRepository {
             headline: anomaly ? "7 h · agité" : "11 h de sommeil",
             message: anomaly ? "Le sommeil de \(name) a été agité cette nuit." : "\(name) a bien dormi cette nuit.",
             detail: anomaly
-                ? "Seulement 7 h de sommeil avec de nombreux réveils. Sommeil profond réduit."
+                // Texte et répartition de la maquette (US-B · alerte, écran 05).
+                ? "7 h · agité, dont 6 h de sommeil profond. Peu de réveils."
                 : "11 h de sommeil, dont 6 h de sommeil profond. Peu de réveils.",
             series: [
                 // « Aujourd'hui » = répartition des phases de la nuit
-                .today: points(["Profond", "Léger", "Éveillé"], anomaly ? [3, 3, 4] : [6, 5, 1]),
+                .today: points(["Profond", "Léger", "Éveillé"], [6, 5, 1]),
                 .week: points(Self.days7, anomaly ? [11, 10, 11, 10, 9, 8, 7] : [11, 10, 12, 11, 10, 11, 11]),
                 .month: points(Self.days30, anomaly ? Self.wave(10, 2, 30, seed: 2, drift: -0.05) : Self.wave(11, 1, 30, seed: 2)),
-            ]
+            ],
+            offersAssistant: anomaly
         )
     }
 
@@ -131,7 +136,8 @@ struct SeedHealthRepository: HealthRepository {
             headline: anomaly ? "39,8 °C" : "38,5 °C",
             message: anomaly ? "La température de \(name) est plus élevée que la normale." : "La température de \(name) est normale.",
             detail: anomaly
-                ? "39,8 °C, au-dessus de sa plage habituelle (38–39,2 °C). À surveiller de près."
+                // Texte de la maquette (US-B · alerte, écran 06).
+                ? "Stable autour de 39,8 °C sur la journée."
                 : "Stable autour de 38,5 °C sur la journée.",
             series: anomaly
                 ? [
@@ -143,7 +149,10 @@ struct SeedHealthRepository: HealthRepository {
                     .today: points(Self.hours(6, 12, step: 1.5), tenth([385, 384, 386, 385, 387, 386, 385, 384, 386, 385, 387, 386])),
                     .week: points(Self.days7, tenth([385, 386, 384, 385, 387, 386, 385])),
                     .month: points(Self.days30, tenth(Self.wave(385, 3, 30, seed: 1))),
-                ]
+                ],
+            // Maquette : tuile en alerte, pastille « À surveiller » dans la feuille.
+            badgeState: anomaly ? .watch : nil,
+            offersAssistant: anomaly
         )
     }
 

@@ -13,6 +13,10 @@ protocol AuthService: Sendable {
     func requestPasswordReset(_ request: ForgotPasswordRequest) async throws
     func resetPassword(_ request: ResetPasswordRequest) async throws
     func resendVerificationEmail() async throws
+    func preferences() async throws -> Preferences
+    func updatePreferences(_ update: PreferencesUpdate) async throws -> Preferences
+    /// Suppression définitive du compte (S25). Les sessions sont fermées côté serveur.
+    func deleteAccount() async throws
 }
 
 /// Client de pawrise-auth (routes `/v1/auth/*` et `/v1/me`).
@@ -61,5 +65,17 @@ final class RemoteAuthService: AuthService {
 
     func resendVerificationEmail() async throws {
         try await client.sendWithoutResponse(.post("v1/auth/resend-verification"))
+    }
+
+    func preferences() async throws -> Preferences {
+        try await client.send(.get("v1/me/preferences"))
+    }
+
+    func updatePreferences(_ update: PreferencesUpdate) async throws -> Preferences {
+        try await client.send(.patch("v1/me/preferences", body: update))
+    }
+
+    func deleteAccount() async throws {
+        try await client.sendWithoutResponse(.delete("v1/me"))
     }
 }
