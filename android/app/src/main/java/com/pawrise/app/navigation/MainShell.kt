@@ -16,7 +16,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.isImeVisible
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -31,6 +31,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -79,8 +80,11 @@ fun MainShell(onSignedOut: () -> Unit) {
     var pendingQuestion by rememberSaveable { mutableStateOf<String?>(null) }
     val health = healthHomeViewModel()
     val dog by health.selectedPet.collectAsStateWithLifecycle()
-    // Comme la barre système, la barre Pawrise s'efface quand le clavier est ouvert.
-    val keyboardVisible = WindowInsets.isImeVisible
+    // Comme la barre système, la barre Pawrise s'efface quand le clavier est ouvert. On mesure la hauteur réelle :
+    // une barre d'outils de saisie (clavier physique, émulateur) compte comme « clavier visible » sans le cacher,
+    // et la barre d'onglets ne revenait plus.
+    val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
+    val keyboardVisible = with(LocalDensity.current) { imeBottom > 120.dp.roundToPx() }
 
     Box(Modifier.fillMaxSize().background(PwColors.SurfacePage)) {
         Column(Modifier.fillMaxSize().imePadding()) {

@@ -8,6 +8,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -60,6 +61,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.pawrise.core.designsystem.theme.PwColors
 import com.pawrise.core.pets.Pet
 import com.pawrise.feature.chat.assistant.TurnRole
+import com.pawrise.core.designsystem.component.PwIcons
 import com.pawrise.feature.home.ui.DogAvatar
 import com.pawrise.feature.home.ui.MaquetteFont
 import com.pawrise.feature.home.ui.PawriseGlyph
@@ -117,6 +119,7 @@ fun ChatRoute(
         state = state,
         onSend = conversation::send,
         onRetry = conversation::retry,
+        onReset = conversation::reset,
         onContactVet = onContactVet,
         onShowIndicators = onShowIndicators,
     )
@@ -131,6 +134,7 @@ fun ChatScreen(
     onContactVet: () -> Unit,
     onShowIndicators: () -> Unit,
     ownerFirstName: String? = null,
+    onReset: () -> Unit = {},
 ) {
     var draft by rememberSaveable(pet.id) { mutableStateOf("") }
     val focusManager = LocalFocusManager.current
@@ -139,7 +143,10 @@ fun ChatScreen(
     LaunchedEffect(state.messages.size, state.isResponding, state.failure) { scroll.animateScrollTo(scroll.maxValue) }
 
     Column(Modifier.fillMaxSize().background(PwColors.SurfacePage)) {
-        ChatHeader(pet)
+        ChatHeader(pet, canReset = state.messages.isNotEmpty() || state.isResponding, onReset = {
+            draft = ""
+            onReset()
+        })
         Column(
             Modifier
                 .weight(1f)
@@ -197,20 +204,19 @@ fun ChatScreen(
 // En-tête
 
 @Composable
-private fun ChatHeader(pet: Pet) {
+private fun ChatHeader(pet: Pet, canReset: Boolean, onReset: () -> Unit) {
     val connected = pet.collar?.connected == true
     Row(
         Modifier
             .fillMaxWidth()
             .background(PwColors.SurfacePage)
             // Maquette : cadre de 82 dp, contenu centré (20 dp au-dessus, 18 dp au-dessous).
-            .padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 18.dp)
-            .semantics(mergeDescendants = true) { },
+            .padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 18.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         DogAvatar(pet, 44.dp, cornerRadius = 16.dp)
-        Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+        Column(Modifier.weight(1f).semantics(mergeDescendants = true) { }, verticalArrangement = Arrangement.spacedBy(5.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("Pawrise", style = maquetteStyle(MaquetteFont.Inter, 17f, FontWeight.SemiBold, 1.35f, PwColors.TextPrimary))
                 Box(
@@ -229,6 +235,18 @@ private fun ChatHeader(pet: Pet) {
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+        }
+        if (canReset) {
+            Box(
+                Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .clickable(onClickLabel = "Nouvelle conversation", role = Role.Button, onClick = onReset)
+                    .semantics { contentDescription = "Nouvelle conversation" },
+                contentAlignment = Alignment.Center,
+            ) {
+                PawriseGlyph(PwIcons.Trash, 22.dp, PwColors.TextMuted)
+            }
         }
     }
 }

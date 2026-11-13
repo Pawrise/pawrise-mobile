@@ -57,9 +57,12 @@ class ChatConversation(
     private val petRef: String,
     private val service: AssistantService,
     private val scope: CoroutineScope,
-    /** Fil stable pour toute la session de ce chien. */
-    val threadId: String = UUID.randomUUID().toString(),
+    /** Fil de la conversation ; un nouveau fil à chaque « Nouvelle conversation ». */
+    threadId: String = UUID.randomUUID().toString(),
 ) {
+    var threadId: String = threadId
+        private set
+
     private val _state = MutableStateFlow(ChatUiState())
     val state: StateFlow<ChatUiState> = _state.asStateFlow()
 
@@ -95,6 +98,15 @@ class ChatConversation(
                 failure = if (it.messages.lastOrNull()?.role == TurnRole.Owner) INTERRUPTED else it.failure,
             )
         }
+    }
+
+    /** « Nouvelle conversation » : interrompt le tour en cours, vide le fil et repart sur un nouveau fil. */
+    fun reset() {
+        turn?.cancel()
+        turn = null
+        activeTurnId = null
+        threadId = UUID.randomUUID().toString()
+        _state.value = ChatUiState()
     }
 
     private fun startTurn(userMessage: String) {
