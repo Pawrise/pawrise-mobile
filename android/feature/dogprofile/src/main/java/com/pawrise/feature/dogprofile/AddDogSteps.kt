@@ -181,7 +181,7 @@ private fun UnitField(value: String, onValueChange: (String) -> Unit, unit: Stri
 }
 
 /** Position de l'unité : 221,5 dp du bord du champ, moins la marge intérieure de 16. */
-private val UNIT_OFFSET = 205.5.dp
+private val UNIT_OFFSET = 203.dp
 
 /**
  * Maquette A08 : photo ronde 160, bouton « + » 44 en bas à droite, « ou choisissez un exemple » (Inter 12,5),

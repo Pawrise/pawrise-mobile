@@ -290,18 +290,8 @@ private fun RhythmStrip(points: List<ChartPoint>, state: HealthState) {
         },
     ) {
         val radius = CornerRadius(8.dp.toPx())
+        // Fond teinté à 8 %, sans contour visible (le filet de la maquette a la même teinte que le fond).
         drawRoundRect(backdrop.copy(alpha = 0.08f), cornerRadius = radius)
-        if (state != HealthState.Good) {
-            // Maquette (alerte) : filet intérieur de 1 dp à 8 %.
-            val inset = 0.5.dp.toPx()
-            drawRoundRect(
-                backdrop.copy(alpha = 0.08f),
-                topLeft = Offset(inset, inset),
-                size = Size(size.width - 2 * inset, size.height - 2 * inset),
-                cornerRadius = radius,
-                style = Stroke(1.dp.toPx()),
-            )
-        }
         translate(top = 61.dp.toPx()) {
             scale(density, pivot = Offset.Zero) { drawPath(afibPath, tint) }
         }

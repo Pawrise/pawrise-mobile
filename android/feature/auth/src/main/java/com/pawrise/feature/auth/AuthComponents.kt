@@ -56,7 +56,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pawrise.core.designsystem.component.PwIcons
-import com.pawrise.core.designsystem.theme.BricolageGrotesque
+import com.pawrise.core.designsystem.theme.bricolageGrotesque
 import com.pawrise.core.designsystem.theme.Inter
 import com.pawrise.core.designsystem.theme.PwColors
 
@@ -97,7 +97,7 @@ internal fun AuthTitle(title: String, subtitle: String, subtitleSize: Float = 14
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
             title,
-            style = pwText(26f, FontWeight.Bold, family = BricolageGrotesque),
+            style = pwText(26f, FontWeight.Bold, family = bricolageGrotesque(26f)),
             modifier = Modifier.semantics { heading() },
         )
         Text(subtitle, style = pwText(subtitleSize, color = PwColors.TextMuted))

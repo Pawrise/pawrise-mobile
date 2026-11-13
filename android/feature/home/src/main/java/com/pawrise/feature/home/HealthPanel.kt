@@ -141,7 +141,7 @@ private fun HealthPanel(onClose: () -> Unit, content: @Composable () -> Unit) {
                 .semantics { paneTitle = "Détail" }
                 .verticalScroll(rememberScrollState())
                 .windowInsetsPadding(WindowInsets.navigationBars)
-                .padding(start = 21.dp, end = 21.dp, top = 13.dp, bottom = 33.dp),
+                .padding(start = 20.dp, end = 20.dp, top = 13.dp, bottom = 33.dp),
         ) {
             content()
         }

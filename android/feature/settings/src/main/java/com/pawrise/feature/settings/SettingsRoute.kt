@@ -55,7 +55,7 @@ import coil3.compose.AsyncImage
 import com.pawrise.core.auth.CURRENT_TERMS_VERSION
 import com.pawrise.core.auth.User
 import com.pawrise.core.designsystem.R
-import com.pawrise.core.designsystem.theme.BricolageGrotesque
+import com.pawrise.core.designsystem.theme.bricolageGrotesque
 import com.pawrise.core.designsystem.theme.DmMono
 import com.pawrise.core.designsystem.theme.PwColors
 import com.pawrise.core.pets.Pet
@@ -125,7 +125,7 @@ internal fun SettingsScreen(
     ) {
         Text(
             "Paramètres",
-            style = pwText(26f, FontWeight.Bold, lineHeight = 1.2f, family = BricolageGrotesque),
+            style = pwText(26f, FontWeight.Bold, lineHeight = 1.2f, family = bricolageGrotesque(26f)),
             modifier = Modifier.padding(top = 16.dp, bottom = 21.5.dp).semantics { heading() },
         )
 

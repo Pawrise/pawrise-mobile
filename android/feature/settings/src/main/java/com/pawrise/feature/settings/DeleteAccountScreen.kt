@@ -36,7 +36,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.pawrise.core.designsystem.theme.BricolageGrotesque
+import com.pawrise.core.designsystem.theme.bricolageGrotesque
 import com.pawrise.core.designsystem.theme.PwColors
 
 /**
@@ -77,7 +77,7 @@ internal fun DeleteAccountScreen(
             SettingsCard {
                 Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Icon(SettingsIcons.Alert, contentDescription = null, tint = PwColors.StatusAlert, modifier = Modifier.size(32.dp))
-                    Text("Cette action est définitive", style = pwText(20f, FontWeight.Bold, family = BricolageGrotesque))
+                    Text("Cette action est définitive", style = pwText(20f, FontWeight.Bold, family = bricolageGrotesque(20f)))
                     Text(
                         "Votre compte ne pourra pas être récupéré. Pour utiliser Pawrise à nouveau, il faudra en créer un autre.",
                         style = pwText(14f, color = PwColors.TextMuted),

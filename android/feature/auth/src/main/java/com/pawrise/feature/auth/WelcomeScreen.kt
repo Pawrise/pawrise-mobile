@@ -24,7 +24,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.pawrise.core.designsystem.component.PawriseMark
-import com.pawrise.core.designsystem.theme.BricolageGrotesque
+import com.pawrise.core.designsystem.theme.bricolageGrotesque
 import com.pawrise.core.designsystem.theme.PawriseTheme
 import com.pawrise.core.designsystem.theme.PwColors
 
@@ -53,7 +53,7 @@ internal fun WelcomeScreen(onLogin: () -> Unit, onSignup: () -> Unit, modifier: 
             ) { PawriseMark(size = 48.dp) }
             Text(
                 "Pawrise",
-                style = pwText(32f, FontWeight.Bold, family = BricolageGrotesque),
+                style = pwText(32f, FontWeight.Bold, family = bricolageGrotesque(32f)),
                 modifier = Modifier.semantics { heading() },
             )
             Text(

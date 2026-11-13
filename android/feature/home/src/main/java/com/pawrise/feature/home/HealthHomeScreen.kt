@@ -312,8 +312,9 @@ private fun IndicatorsSection(snapshot: HealthSnapshot, onOpen: (HealthSheet) ->
         }
         tiles.chunked(3).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                row.forEach { tile -> HealthTile(tile, Modifier.weight(1f)) }
-                repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
+                // Tuiles de 108 × 108 calées à gauche, comme la maquette (la rangée fait 356 sur 358).
+                row.forEach { tile -> HealthTile(tile, Modifier.size(108.dp)) }
+                repeat(3 - row.size) { Spacer(Modifier.size(108.dp)) }
             }
         }
     }
