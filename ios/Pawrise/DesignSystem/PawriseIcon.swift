@@ -10,7 +10,7 @@ import SwiftUI
 enum PawriseGlyph: Sendable {
     case map, chat, settings, doc, heart, pulse, activity, moon, thermometer, battery
     case alert, alertCircle, swap, close, check, signal, shield, send, paw, sparkles, brand
-    case user, lock, chevronRight, trash, logout
+    case user, lock, chevronRight, trash, logout, eye, eyeOff
 
     /// Tracés Lucide (LucidePaths.swift, généré) ; `brand` (logo) et `sparkles` (✦ plein) restent dessinés ici.
     fileprivate var paths: [String] {
@@ -40,6 +40,8 @@ enum PawriseGlyph: Sendable {
         case .chevronRight: LucidePaths.chevronRight
         case .trash: LucidePaths.trash
         case .logout: LucidePaths.logout
+        case .eye: LucidePaths.eye
+        case .eyeOff: LucidePaths.eyeOff
         case .brand: []
         }
     }

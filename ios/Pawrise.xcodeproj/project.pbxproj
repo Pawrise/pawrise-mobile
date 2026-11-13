@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		A10000000000000000000201 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000502 /* GoogleSignIn */; };
+		A10000000000000000000202 /* PhoneNumberKit in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000504 /* PhoneNumberKit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -50,6 +51,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A10000000000000000000201 /* GoogleSignIn in Frameworks */,
+				A10000000000000000000202 /* PhoneNumberKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -124,6 +126,7 @@
 			name = Pawrise;
 			packageProductDependencies = (
 				A10000000000000000000502 /* GoogleSignIn */,
+				A10000000000000000000504 /* PhoneNumberKit */,
 			);
 			productName = Pawrise;
 			productReference = A10000000000000000000011 /* Pawrise.app */;
@@ -205,6 +208,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				A10000000000000000000501 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
+				A10000000000000000000503 /* XCRemoteSwiftPackageReference "PhoneNumberKit" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A10000000000000000000003 /* Products */;
@@ -502,6 +506,14 @@
 				minimumVersion = 8.0.0;
 			};
 		};
+		A10000000000000000000503 /* XCRemoteSwiftPackageReference "PhoneNumberKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/PhoneNumberKit/PhoneNumberKit.git";
+			requirement = {
+				kind = exactVersion;
+				version = 5.0.13;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -509,6 +521,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = A10000000000000000000501 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
 			productName = GoogleSignIn;
+		};
+		A10000000000000000000504 /* PhoneNumberKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A10000000000000000000503 /* XCRemoteSwiftPackageReference "PhoneNumberKit" */;
+			productName = PhoneNumberKit;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

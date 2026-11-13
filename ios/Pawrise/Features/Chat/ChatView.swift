@@ -34,6 +34,7 @@ private struct ChatConversationView: View {
     let model: ChatViewModel
 
     @Environment(TabRouter.self) private var router
+    @Environment(SessionStore.self) private var session
     @State private var draft = ""
     @FocusState private var isComposerFocused: Bool
 
@@ -109,10 +110,9 @@ private struct ChatConversationView: View {
         }
     }
 
-    /// « Bonjour 👋 Je suis Pawrise… » : l'émoji est rendu avec la police système (Inter n'en a pas).
+    /// « Bonjour Alex 👋 Je suis Pawrise, l'assistant de Nala… » (prénom du compte connecté).
     private var welcome: Text {
-        let wave = Text("👋").font(.system(size: ChatLayout.bubbleFontSize))
-        return Text("Bonjour \(wave) Je suis Pawrise, l'assistant de \(dog.name). Que souhaitez-vous consulter ?")
+        ChatWelcome.text(ownerFirstName: session.user?.firstName, dogName: dog.name, fontSize: ChatLayout.bubbleFontSize)
     }
 
     /// Change à chaque nouvel élément du fil pour déclencher le défilement vers le bas.

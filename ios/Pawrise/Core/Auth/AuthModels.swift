@@ -122,20 +122,10 @@ enum CredentialRules {
         (passwordMinLength...passwordMaxLength).contains(password.count)
     }
 
-    /// Convertit un numéro saisi en E.164 (format du contrat). Un numéro français à 10 chiffres
-    /// (06 12 34 56 78) devient +33612345678. Renvoie nil si le numéro n'est pas reconnu.
+    /// Convertit un numéro saisi en E.164 (format du contrat) avec PhoneNumberKit, région par défaut FR :
+    /// 06 12 34 56 78 devient +33612345678. Renvoie nil si le numéro n'est pas valide.
     static func e164Phone(_ raw: String) -> String? {
-        let compact = raw.filter { !" .-()".contains($0) }
-        if compact.hasPrefix("+") {
-            let digits = compact.dropFirst()
-            return digits.allSatisfy(\.isNumber) && (8...15).contains(digits.count) && digits.first != "0"
-                ? compact : nil
-        }
-        if compact.hasPrefix("00") { return e164Phone("+" + compact.dropFirst(2)) }
-        if compact.count == 10, compact.hasPrefix("0"), compact.allSatisfy(\.isNumber) {
-            return "+33" + compact.dropFirst()
-        }
-        return nil
+        PhoneInput.e164(raw)
     }
 
     static func isValidResetCode(_ code: String) -> Bool {

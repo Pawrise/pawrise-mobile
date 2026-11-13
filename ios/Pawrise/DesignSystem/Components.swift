@@ -110,6 +110,62 @@ struct LabeledField<Field: View>: View {
     }
 }
 
+/// Saisie de mot de passe avec un œil (Lucide « eye » / « eye-off ») pour afficher ou masquer le texte.
+/// À placer dans un `LabeledField`. Les deux saisies (masquée et en clair) restent dans la vue et on bascule leur
+/// visibilité : retirer le `SecureField` ferait croire à iOS que le formulaire est envoyé (« Enregistrer le mot de
+/// passe ? »). Le focus suit la saisie visible.
+struct PasswordInput<Focus: Hashable>: View {
+    @Binding var text: String
+    var prompt: String?
+    var contentType: UITextContentType = .password
+    var focus: FocusState<Focus?>.Binding
+    var focusValue: Focus
+
+    @State private var isRevealed = false
+    /// Focus de la saisie cachée (jamais active).
+    @FocusState private var parked: Focus?
+
+    var body: some View {
+        HStack(spacing: 12) {
+            ZStack(alignment: .leading) {
+                SecureField("", text: $text, prompt: promptText)
+                    .credentialContentType(contentType)
+                    .focused(isRevealed ? $parked : focus, equals: focusValue)
+                    .opacity(isRevealed ? 0 : 1)
+                    .allowsHitTesting(!isRevealed)
+                    .accessibilityHidden(isRevealed)
+                TextField("", text: $text, prompt: promptText)
+                    .credentialContentType(contentType)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .focused(isRevealed ? focus : $parked, equals: focusValue)
+                    .opacity(isRevealed ? 1 : 0)
+                    .allowsHitTesting(isRevealed)
+                    .accessibilityHidden(!isRevealed)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Button {
+                let wasFocused = focus.wrappedValue == focusValue
+                isRevealed.toggle()
+                // La saisie visible change : on lui rend le focus.
+                if wasFocused {
+                    Task { @MainActor in focus.wrappedValue = focusValue }
+                }
+            } label: {
+                PawriseIcon(isRevealed ? .eyeOff : .eye, size: 20)
+                    .foregroundStyle(Color.Pawrise.textMuted)
+                    .contentShape(Rectangle().inset(by: -12))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(isRevealed ? "Masquer le mot de passe" : "Afficher le mot de passe")
+            .accessibilityIdentifier("password-visibility")
+        }
+    }
+
+    private var promptText: Text? { prompt.map { Text(verbatim: $0) } }
+}
+
 /// Bandeau d'erreur sous un formulaire.
 struct ErrorBanner: View {
     let message: String

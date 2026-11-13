@@ -46,6 +46,8 @@ ICONS = {
     "search": "search",
     "mail": "mail",
     "smartphone": "smartphone",
+    "eye": "eye",
+    "eyeOff": "eye-off",
 }
 
 # assets iOS (catalogue Onboarding.xcassets) : nom → (icône, taille en pt, trait sur la grille 24)
