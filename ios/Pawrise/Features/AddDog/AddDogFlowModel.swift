@@ -45,6 +45,10 @@ final class AddDogFlowModel {
     var sex: Dog.Sex?
     /// Texte saisi dans le champ de recherche de race.
     var breedQuery = ""
+    /// Recherche de races côté serveur (branchée par l'écran sur `DogStore.searchBreeds`) ; `nil` = liste embarquée.
+    @ObservationIgnored var breedSearch: ((String) async -> [String]?)?
+    private var remoteBreeds: (query: String, names: [String])?
+    @ObservationIgnored private var breedSearchTask: Task<Void, Never>?
     /// Race choisie dans la liste (prioritaire sur le texte libre).
     var selectedBreed: String?
     var weightText = ""
@@ -83,9 +87,12 @@ final class AddDogFlowModel {
         return typed.isEmpty ? nil : typed
     }
 
+    /// Sans saisie : les races de la maquette (A12). Pendant la saisie : le référentiel de l'API-CORE quand il a répondu
+    /// pour ce texte, sinon la liste embarquée.
     var breedSuggestions: [String] {
         let query = breedQuery.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else { return DogCatalog.breeds }
+        if let remote = remoteBreeds, remote.query == query { return remote.names }
         return DogCatalog.breeds.filter {
             $0.range(of: query, options: [.caseInsensitive, .diacriticInsensitive]) != nil
         }
@@ -205,6 +212,19 @@ final class AddDogFlowModel {
     func breedQueryDidChange() {
         if let selectedBreed, selectedBreed != breedQuery {
             self.selectedBreed = nil
+        }
+        searchBreedsOnServer()
+    }
+
+    /// Interroge le référentiel après une courte pause de frappe ; une réponse arrivée trop tard est ignorée.
+    private func searchBreedsOnServer() {
+        breedSearchTask?.cancel()
+        let query = breedQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let breedSearch, !query.isEmpty else { return }
+        breedSearchTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(250))
+            guard !Task.isCancelled, let names = await breedSearch(query), !Task.isCancelled else { return }
+            self?.remoteBreeds = (query, names)
         }
     }
 
