@@ -1,0 +1,8 @@
+<!-- Pastille photo : disque + Lucide « plus » 0.544.0 (ISC), généré par scripts/lucide_icons.py -->
+<svg xmlns="http://www.w3.org/2000/svg" width="44" height="44" viewBox="0 0 44 44">
+  <circle cx="22" cy="22" r="22" fill="#0a5c78"/>
+  <g transform="translate(8.285714 8.285714) scale(1.142857)" fill="none" stroke="#ffffff" stroke-width="2.275" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M5 12h14"/>
+    <path d="M12 5v14"/>
+  </g>
+</svg>
