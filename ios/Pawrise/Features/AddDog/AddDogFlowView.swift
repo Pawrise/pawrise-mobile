@@ -30,6 +30,7 @@ struct AddDogFlowView: View {
         .ignoresSafeArea(.container, edges: .bottom)
         .animation(.easeOut(duration: 0.25), value: contentID)
         .pawrisePage()
+        .task { model.breedSearch = { [dogs = environment.dogs] in await dogs.searchBreeds($0) } }
     }
 
     private var contentID: String {

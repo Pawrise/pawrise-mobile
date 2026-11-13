@@ -181,6 +181,13 @@ final class DogStore {
         }
     }
 
+    /// Races proposées pendant la saisie : référentiel de l'API-CORE en remote (nomenclature FCI complète),
+    /// `nil` en mode local ou en cas d'échec (l'écran garde alors la liste embarquée).
+    func searchBreeds(_ query: String) async -> [String]? {
+        guard case let .remote(service) = backend else { return nil }
+        return try? await service.listBreeds(query: query, limit: 20).map(\.name)
+    }
+
     func selectNextDog() {
         guard dogs.count > 1, let current = selectedDog, let index = dogs.firstIndex(of: current) else { return }
         selectedDogID = dogs[(index + 1) % dogs.count].id
