@@ -346,8 +346,7 @@ private struct TermsCheckbox: View {
                         RoundedRectangle(cornerRadius: 6)
                             .strokeBorder(isOn ? Color.Pawrise.primary : (error == nil ? Color.Pawrise.borderStrong : Color.Pawrise.alert), lineWidth: 1)
                         if isOn {
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 12, weight: .bold))
+                            PawriseIcon(.check, size: 14, lineWidth: 3.4)
                                 .foregroundStyle(Color.Pawrise.onPrimary)
                         }
                     }

@@ -279,8 +279,7 @@ struct DogAvatar: View {
     }
 
     private var placeholder: some View {
-        Image(systemName: "pawprint.fill")
-            .font(.system(size: size * 0.35))
+        PawriseIcon(.paw, size: size * 0.35)
             .foregroundStyle(Color.Pawrise.primary.opacity(0.5))
     }
 }

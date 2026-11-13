@@ -1,5 +1,8 @@
+<!-- Pastille photo : disque + Lucide « plus » 0.544.0 (ISC), généré par scripts/lucide_icons.py -->
 <svg xmlns="http://www.w3.org/2000/svg" width="44" height="44" viewBox="0 0 44 44">
-<path transform="matrix(1.00000 0.00000 0.00000 1.00000 0.0000 0.0000)" d="M22 44C34.1503 44 44 34.1503 44 22C44 9.84974 34.1503 0 22 0C9.84974 0 0 9.84974 0 22C0 34.1503 9.84974 44 22 44Z" fill="#0a5c78" fill-opacity="1.000" fill-rule="nonzero"/>
-<path transform="matrix(1.00000 0.00000 0.00000 1.00000 14.0000 14.0000)" d="M8 0L8 16ZM0 8L16 8Z" fill="#000000" fill-opacity="1.000" fill-rule="nonzero"/>
-<path transform="matrix(1.00000 0.00000 0.00000 1.00000 14.0000 14.0000)" d="M9.3 0C9.3 -0.71797 8.71797 -1.3 8 -1.3C7.28203 -1.3 6.7 -0.71797 6.7 0L8 0L9.3 0ZM6.7 16C6.7 16.718 7.28203 17.3 8 17.3C8.71797 17.3 9.3 16.718 9.3 16L8 16L6.7 16ZM0 6.7C-0.71797 6.7 -1.3 7.28203 -1.3 8C-1.3 8.71797 -0.71797 9.3 0 9.3L0 8L0 6.7ZM16 9.3C16.718 9.3 17.3 8.71797 17.3 8C17.3 7.28203 16.718 6.7 16 6.7L16 8L16 9.3ZM8 0L6.7 0L6.7 16L8 16L9.3 16L9.3 0L8 0ZM0 8L0 9.3L16 9.3L16 8L16 6.7L0 6.7L0 8Z" fill="#ffffff" fill-opacity="1.000"/>
+  <circle cx="22" cy="22" r="22" fill="#0a5c78"/>
+  <g transform="translate(8.285714 8.285714) scale(1.142857)" fill="none" stroke="#ffffff" stroke-width="2.275" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M5 12h14"/>
+    <path d="M12 5v14"/>
+  </g>
 </svg>

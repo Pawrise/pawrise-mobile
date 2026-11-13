@@ -15,10 +15,8 @@ struct DeleteAccountView: View {
         List {
             Section {
                 VStack(alignment: .leading, spacing: 12) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.system(size: 32))
+                    PawriseIcon(.alert, size: 32)
                         .foregroundStyle(Color.Pawrise.alert)
-                        .accessibilityHidden(true)
                     Text("Cette action est définitive")
                         .font(Font.Pawrise.title2)
                         .foregroundStyle(Color.Pawrise.textPrimary)

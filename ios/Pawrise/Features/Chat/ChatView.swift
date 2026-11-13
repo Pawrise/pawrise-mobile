@@ -391,7 +391,7 @@ private struct FailureRow: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 10) {
-            Image(systemName: "exclamationmark.circle")
+            PawriseIcon(.alertCircle, size: 18)
                 .foregroundStyle(Color.Pawrise.alert)
                 .accessibilityHidden(true)
             Text(message)

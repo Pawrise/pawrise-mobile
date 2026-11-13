@@ -5,54 +5,47 @@ import SwiftUI
 
 // MARK: - Icônes du Figma
 
-/// Icônes du Figma « Pawrise-App » (grille 24 × 24, trait 1,9 mis à l'échelle), reprises du composant
-/// `Icon` du prototype (pawrise-figma/src/components/Icon.tsx) pour un rendu identique à la maquette.
+/// Icônes de la maquette « Pawrise-App » (grille 24 × 24, trait 1,9 mis à l'échelle), dessinées avec Lucide :
+/// les tracés exportés de Figma sont déformés (traits vectorisés). Même source que l'app Android.
 enum PawriseGlyph: Sendable {
     case map, chat, settings, doc, heart, pulse, activity, moon, thermometer, battery
-    case alert, swap, close, check, signal, shield, send, paw, sparkles, brand
+    case alert, alertCircle, swap, close, check, signal, shield, send, paw, sparkles, brand
     case user, lock, chevronRight, trash, logout
 
+    /// Tracés Lucide (LucidePaths.swift, généré) ; `brand` (logo) et `sparkles` (✦ plein) restent dessinés ici.
     fileprivate var paths: [String] {
         switch self {
-        case .map: ["M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2Z", "M9 4v14M15 6v14"]
-        case .chat: ["M4 5h16v11H9l-5 4V5Z"]
-        case .settings: [
-            "M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 0 1 0 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 0 1 0-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.281Z",
-            "M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z",
-        ]
-        case .doc: ["M6 3h8l4 4v14H6V3Z", "M14 3v4h4M9 13h6M9 17h6"]
-        case .heart: ["M12 20s-7-4.5-9.5-9C1 8 2.5 4.5 6 4.5c2 0 3.2 1.2 4 2.5.8-1.3 2-2.5 4-2.5 3.5 0 5 3.5 3.5 6.5C19 15.5 12 20 12 20Z"]
-        case .pulse: ["M2 12h4l2-5 4 12 2.5-9 1.5 2H22"]
-        case .activity: ["M2 12h4l3 8 4-16 3 8h6"]
-        case .moon: ["M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z"]
-        case .thermometer: ["M14 14.7V5a2 2 0 1 0-4 0v9.7a4 4 0 1 0 4 0Z", "M12 9v6"]
-        case .battery: ["M4 8h12a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2Z", "M22 11v2"]
-        case .alert: ["M12 3 2 20h20L12 3Z", "M12 10v4M12 17h.01"]
-        case .swap: ["M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5"]
-        case .close: ["M6 6l12 12M18 6 6 18"]
-        case .check: ["m5 12 5 5L20 6"]
-        case .signal: ["M4 18v-3M9 18v-6M14 18v-9M19 18V6"]
-        case .shield: ["M12 3 5 6v6c0 4.5 3 7.5 7 9 4-1.5 7-4.5 7-9V6l-7-3Z"]
-        case .send: ["M4 12 20 4l-6 16-3-6-7-2Z"]
-        case .paw: [
-            Self.circle(7, 9, 1.7), Self.circle(12, 7, 1.7), Self.circle(17, 9, 1.7),
-            "M12 12c-2.5 0-4.5 2-4.5 4S9 21 12 21s4.5-1 4.5-3-2-4-4.5-4Z",
-        ]
+        case .map: LucidePaths.map
+        case .chat: LucidePaths.chat
+        case .settings: LucidePaths.settings
+        case .doc: LucidePaths.doc
+        case .heart: LucidePaths.heart
+        case .pulse: LucidePaths.pulse
+        case .activity: LucidePaths.activity
+        case .moon: LucidePaths.moon
+        case .thermometer: LucidePaths.thermometer
+        case .battery: LucidePaths.battery
+        case .alert: LucidePaths.alert
+        case .alertCircle: LucidePaths.alertCircle
+        case .swap: LucidePaths.swap
+        case .close: LucidePaths.close
+        case .check: LucidePaths.check
+        case .signal: LucidePaths.signal
+        case .shield: LucidePaths.shield
+        case .send: LucidePaths.send
+        case .paw: LucidePaths.paw
         case .sparkles: ["M12 3l1.8 4.7L18.5 9l-4.7 1.8L12 15l-1.8-4.2L5.5 9l4.7-1.3L12 3ZM19 15l.9 2.3 2.1.7-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.7L19 15Z"]
-        case .user: [Self.circle(12, 8, 4), "M4 21c0-4 3.6-6 8-6s8 2 8 6"]
-        case .lock: ["M6 10h12a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-6a2 2 0 0 1 2-2Z", "M8 10V7a4 4 0 0 1 8 0v3"]
-        case .chevronRight: ["m9 6 6 6-6 6"]
-        case .trash: ["M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"]
-        case .logout: ["M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3", "M10 17l5-5-5-5M15 12H4"]
+        case .user: LucidePaths.user
+        case .lock: LucidePaths.lock
+        case .chevronRight: LucidePaths.chevronRight
+        case .trash: LucidePaths.trash
+        case .logout: LucidePaths.logout
         case .brand: []
         }
     }
 
     fileprivate var isFilled: Bool { self == .brand || self == .sparkles }
 
-    private static func circle(_ cx: Double, _ cy: Double, _ r: Double) -> String {
-        "M\(cx - r) \(cy)a\(r) \(r) 0 1 0 \(2 * r) 0a\(r) \(r) 0 1 0 \(-2 * r) 0Z"
-    }
 }
 
 /// Forme d'une icône, dessinée dans le carré `rect`.
