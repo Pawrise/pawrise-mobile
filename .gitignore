@@ -12,6 +12,7 @@ ios/Config/Local.xcconfig
 # Gradle / Android
 .gradle/
 build/
+.docker-build/
 local.properties
 *.apk
 *.aab
@@ -28,5 +29,6 @@ captures/
 # Secrets
 *.jks
 *.keystore
+!android/app/debug.keystore
 google-services.json
 .env

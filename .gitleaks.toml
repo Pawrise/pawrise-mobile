@@ -5,9 +5,15 @@ title = "pawrise-mobile"
 useDefault = true
 
 [allowlist]
-description = "Valeurs fictives : tests iOS et exemples du contrat OpenAPI servi par le mock Prism"
+description = "Valeurs fictives : tests iOS, exemples du contrat OpenAPI (mock Prism, tests et README)"
+# Un fichier OU une valeur listée suffit (condition OR par défaut).
 paths = [
   '''^ios/PawriseTests/''',
   '''^ios/PawriseUITests/''',
   '''^api/openapi\.yaml$''',
+]
+regexes = [
+  '''^chien-oslo-2026$''',
+  '''^nouveau-chien-2026$''',
+  '''^prt_(9kLm2Wv7|4bS0n9xQ)$''',
 ]

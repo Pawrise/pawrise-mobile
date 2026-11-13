@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Rend le mock d'API (port 4010) joignable en http://localhost:4010 depuis l'émulateur ou le téléphone branché.
+# Rend les services locaux joignables en http://localhost:<port> depuis l'émulateur ou le téléphone branché :
+# API-CORE (3000), pawrise-auth (8200), pawrise-assistant (8100) et le mock Prism des tests de contrat (4010).
 set -euo pipefail
-adb reverse tcp:4010 tcp:4010
-echo "OK : l'app joint le mock sur http://localhost:4010"
+for port in 3000 8200 8100 4010; do adb reverse "tcp:$port" "tcp:$port"; done
+echo "OK : ports 3000, 8200, 8100 et 4010 joignables depuis l'appareil"
