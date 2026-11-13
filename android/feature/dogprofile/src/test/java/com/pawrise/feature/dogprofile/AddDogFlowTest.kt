@@ -164,7 +164,7 @@ class AddDogFlowTest {
         tap("Mâle")
         next()
         repeat(4) { next() }
-        see("Non renseignée")
+        see("Le profil de Rio")
         tap("Continuer")
 
         assertEquals(emptyList<Breed>(), pets.created.single().breeds)

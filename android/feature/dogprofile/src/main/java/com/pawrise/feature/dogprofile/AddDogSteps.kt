@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -42,6 +43,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import com.pawrise.core.designsystem.component.PwFieldError
 import com.pawrise.core.designsystem.component.PwFlowTextField
@@ -252,18 +254,22 @@ private fun SexCard(label: String, symbol: String, selected: Boolean, modifier: 
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
     ) {
-        Text(
-            symbol,
-            style = PwText.symbols(36f),
-            color = PwColors.TextPrimary,
-            modifier = Modifier.height(49.dp).offset(y = SYMBOL_OFFSET).clearAndSetSemantics {},
-        )
+        // Boîte de 49 dp (interligne Figma) ; la police a de grandes métriques (2,05 em) : on place la ligne
+        // naturelle nous-mêmes pour que l'encre tombe où Figma la dessine.
+        Box(Modifier.height(49.dp).clearAndSetSemantics {}, contentAlignment = Alignment.TopCenter) {
+            Text(
+                symbol,
+                style = PwText.symbols(36f).copy(lineHeight = TextUnit.Unspecified),
+                color = PwColors.TextPrimary,
+                modifier = Modifier.wrapContentHeight(Alignment.Top, unbounded = true).offset(y = SYMBOL_OFFSET),
+            )
+        }
         Text(label, style = PwText.inter(15f, FontWeight.SemiBold), color = PwColors.TextPrimary)
     }
 }
 
-/** Figma place l'encre du symbole un peu plus haut dans sa boîte de 49 dp. */
-private val SYMBOL_OFFSET = (-3).dp
+/** Haut de la ligne naturelle du symbole par rapport à sa boîte de 49 dp (encre placée comme dans Figma). */
+private val SYMBOL_OFFSET = (-15.7).dp
 
 /** Maquette A12 : champ de recherche puis suggestions (même cadre ; choisie : fond #E5F1F7, bordure #0A5C78). */
 @Composable

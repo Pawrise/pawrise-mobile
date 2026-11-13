@@ -198,8 +198,11 @@ private fun Scan(error: String?, onManual: () -> Unit, camera: @Composable (Modi
             camera(Modifier.fillMaxSize())
         }
         error?.let { ErrorBanner(it) }
-        TextButton(onClick = onManual) {
-            Text("Saisir le code manuellement", style = PwText.inter(14f, FontWeight.SemiBold), color = PwColors.Action)
+        // Même hauteur que le bouton « QR code détecté » de la maquette (56) : le bloc reste centré au même endroit.
+        Box(Modifier.heightIn(min = 56.dp), contentAlignment = Alignment.Center) {
+            TextButton(onClick = onManual) {
+                Text("Saisir le code manuellement", style = PwText.inter(14f, FontWeight.SemiBold), color = PwColors.Action)
+            }
         }
     }
 }

@@ -7,6 +7,8 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import com.pawrise.app.MainActivity
@@ -24,7 +26,10 @@ import kotlinx.coroutines.CompletableDeferred
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import dagger.hilt.android.testing.UninstallModules
+import android.os.Looper
+import java.time.Duration
 import org.junit.Rule
+import org.robolectric.Shadows.shadowOf
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -74,6 +79,20 @@ class ParcoursScreenCaptureTest {
     @BindValue @JvmField val repository: AuthRepository = FakeAuthRepository(SessionState.SignedIn)
     @BindValue @JvmField val petRepository: PetRepository = pets
 
+    /** Laisse finir les ondulations (animées par l'horloge du Looper, pas par celle de Compose) puis capture. */
+    private fun shot(label: String) {
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(2))
+        compose.snapshot(label)
+    }
+
+    /** Appui par l'action d'accessibilité : pas d'ondulation figée sur la capture suivante. */
+    private fun press(text: String) {
+        val node = compose.onNodeWithText(text)
+        runCatching { node.performScrollTo() }
+        node.performSemanticsAction(SemanticsActions.OnClick)
+        compose.waitForIdle()
+    }
+
     /** Sans clavier ni curseur, comme la maquette. */
     private fun unfocus() {
         compose.runOnUiThread { compose.activity.window.decorView.findFocus()?.clearFocus() }
@@ -92,54 +111,54 @@ class ParcoursScreenCaptureTest {
         compose.waitForIdle()
 
         listOf("A03", "A04", "A05", "A06").forEach {
-            compose.snapshot(it)
-            compose.tap("Suivant")
+            shot(it)
+            press("Suivant")
         }
-        compose.snapshot("A07")
-        compose.tap("Connecter le collier")
+        shot("A07")
+        press("Connecter le collier")
 
-        compose.onNodeWithContentDescription("Exemple de photo 1").performClick()
-        compose.snapshot("A08")
-        compose.tap("Suivant")
+        compose.onNodeWithContentDescription("Exemple de photo 1").performSemanticsAction(SemanticsActions.OnClick)
+        shot("A08")
+        press("Suivant")
         type("Nom du chien", "Nala")
-        compose.snapshot("A09")
-        compose.tap("Suivant")
+        shot("A09")
+        press("Suivant")
         type("Date de naissance", "12042023")
-        compose.snapshot("A10")
-        compose.tap("Suivant")
-        compose.tap("Femelle")
-        compose.snapshot("A11")
-        compose.tap("Suivant")
+        shot("A10")
+        press("Suivant")
+        press("Femelle")
+        shot("A11")
+        press("Suivant")
         type("Rechercher une race", "Golden")
         // Liste filtrée (recherche différée) : seule « Golden Retriever » reste.
         compose.waitUntilDoesNotExist(hasText("Croisé"), 5_000)
-        compose.tap("Golden Retriever")
-        compose.snapshot("A12")
-        compose.tap("Suivant")
+        press("Golden Retriever")
+        shot("A12")
+        press("Suivant")
         type("Poids en kilogrammes", "28")
-        compose.snapshot("A13")
-        compose.tap("Suivant")
+        shot("A13")
+        press("Suivant")
         type("Taille en centimètres", "55")
-        compose.snapshot("A14")
-        compose.tap("Suivant")
-        compose.snapshot("A15")
-        compose.tap("Suivant")
-        compose.snapshot("A16")
-        compose.tap("Continuer")
+        shot("A14")
+        press("Suivant")
+        shot("A15")
+        press("Suivant")
+        shot("A16")
+        press("Continuer")
 
         compose.waitUntilAtLeastOneExists(hasText("Connectons le collier de Nala"), 5_000)
-        compose.snapshot("A17")
-        compose.tap("Scanner le QR code")
-        compose.snapshot("A18")
+        shot("A17")
+        press("Scanner le QR code")
+        shot("A18")
         compose.onNodeWithContentDescription("Retour").performClick()
         compose.waitForIdle()
-        compose.tap("Saisir le code manuellement")
+        press("Saisir le code manuellement")
         type("Code du collier", "PW-ABC123")
         val gate = CompletableDeferred<Unit>().also { pets.gate = it }
-        compose.tap("Activer le collier")
-        compose.snapshot("A19")
+        press("Activer le collier")
+        shot("A19")
         gate.complete(Unit)
         compose.waitUntilAtLeastOneExists(hasText("Le collier de Nala est activé"), 5_000)
-        compose.snapshot("A20")
+        shot("A20")
     }
 }

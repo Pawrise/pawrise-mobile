@@ -6,6 +6,7 @@ import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextMotion
 import androidx.compose.ui.unit.TextUnit
@@ -79,7 +80,9 @@ object PwText {
 
     /** Inter (textes, libellés, boutons). */
     fun inter(size: Float, weight: FontWeight = FontWeight.Normal, lineHeight: Float = FIGMA_LINE_HEIGHT): TextStyle =
-        style(Inter, size, weight, lineHeight)
+        // Figma tolère un dépassement de largeur inférieur au point (ligne de 350,3 pt dans une boîte de 350,
+        // A17) : un très léger resserrement (0,01 sp par glyphe) donne les mêmes coupures de ligne.
+        style(Inter, size, weight, lineHeight).copy(letterSpacing = (-0.01).sp)
 
     /** DM Mono (valeurs : 87 bpm, PW-ABC123…). */
     fun mono(size: Float, weight: FontWeight = FontWeight.Medium, lineHeight: Float = FIGMA_LINE_HEIGHT): TextStyle =
@@ -110,6 +113,8 @@ object PwText {
         // Positions de glyphes fractionnaires (sans arrondi au pixel du hinting), comme Figma : mêmes largeurs
         // de ligne et mêmes coupures que la maquette, y compris aux tailles 12,5 / 13,5.
         textMotion = TextMotion.Animated,
+        // Coupure gloutonne, comme Figma (la coupure « équilibrée » par défaut déplace des mots à la ligne suivante).
+        lineBreak = LineBreak.Simple,
     )
 }
 
@@ -125,6 +130,7 @@ private fun materialStyle(family: FontFamily, weight: FontWeight, size: Float) =
     lineHeight = lh(size),
     lineHeightStyle = FigmaLineHeightStyle,
     textMotion = TextMotion.Animated,
+    lineBreak = LineBreak.Simple,
 )
 
 // Tailles de l'échelle Material conservées ; police variable (taille optique = taille) et interlignes Figma 135 %.
