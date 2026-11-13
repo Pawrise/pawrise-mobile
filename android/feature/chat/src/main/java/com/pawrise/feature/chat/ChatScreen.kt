@@ -331,7 +331,7 @@ private fun TypingDots(modifier: Modifier = Modifier) {
                 ),
                 label = "dot$index",
             )
-            Box(Modifier.offset(y = lift.dp).size(6.dp).background(PwColors.TextMuted, CircleShape))
+            Box(Modifier.offset { androidx.compose.ui.unit.IntOffset(0, lift.dp.roundToPx()) }.size(6.dp).background(PwColors.TextMuted, CircleShape))
         }
     }
 }

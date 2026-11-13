@@ -5,6 +5,7 @@ package com.pawrise.feature.home.ui
  * contour du trait de 1,8 (géométrie `strokeGeometry`, remplissage non nul) dans une boîte de 320 × 44,
  * placée à y = 61 dans la zone de 320 × 150. Même tracé dans les deux états, seule la couleur change.
  */
+@Suppress("TextConcatSpace") // tracé SVG découpé en morceaux, sans espace à ajouter
 internal const val AFIB_STRIP_PATH: String =
     "M2 14L2 14.9L2.58489 14.9L2.82243 14.3655L2 14ZM4.66667 8L5.56528 7.95008L3.84424 7.63448L4.66667 8ZM6.66667 4" +
     "4L5.76805 44.0499L7.56574 44.0409L6.66667 44ZM8.66667 0L9.55077 -0.168401L7.7676 -0.0408669L8.66667 0ZM11.3333" +
