@@ -1,6 +1,8 @@
 package com.pawrise.feature.auth
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -28,6 +30,7 @@ class LoginScreenTest {
     private var loggedIn = 0
     private var back = 0
     private var signup = 0
+    private val forgot = mutableListOf<String>()
 
     @Before
     fun setUp() {
@@ -38,6 +41,7 @@ class LoginScreenTest {
                     onBack = { back++ },
                     onSignup = { signup++ },
                     onLoggedIn = { loggedIn++ },
+                    onForgotPassword = { forgot += it },
                     viewModel = viewModel,
                 )
             }
@@ -56,7 +60,7 @@ class LoginScreenTest {
         fillAndSubmit(email = "  camille.martin@example.com ")
 
         assertEquals(1, loggedIn)
-        assertEquals(listOf("  camille.martin@example.com " to "chien-oslo-2026"), repository.loginCalls)
+        assertEquals(listOf("camille.martin@example.com" to "chien-oslo-2026"), repository.loginCalls)
     }
 
     @Test
@@ -75,7 +79,7 @@ class LoginScreenTest {
 
         fillAndSubmit()
 
-        compose.onNodeWithText("Trop d'essais. Réessayez dans 15 min.").assertIsDisplayed()
+        compose.onNodeWithText("Trop d'essais ratés. Réessayez dans 15 minutes ou réinitialisez votre mot de passe.").assertIsDisplayed()
     }
 
     @Test
@@ -84,24 +88,27 @@ class LoginScreenTest {
 
         fillAndSubmit()
 
-        compose.onNodeWithText("Connexion impossible. Vérifiez votre réseau et réessayez.").assertIsDisplayed()
+        compose.onNodeWithText("Impossible de joindre le serveur. Réessayez dans un instant.").assertIsDisplayed()
         assertEquals(0, loggedIn)
     }
 
     @Test
-    fun `champs vides bloques sans appel au serveur`() {
-        compose.onNodeWithText("Se connecter").performClick()
+    fun `bouton inactif tant qu'un champ est vide`() {
+        compose.onNodeWithText("Se connecter").assertIsNotEnabled()
+        compose.field("E-mail").performTextInput("camille.martin@example.com")
+        compose.onNodeWithText("Se connecter").assertIsNotEnabled().performClick()
 
-        compose.onNodeWithText("Renseignez votre e-mail et votre mot de passe.").assertIsDisplayed()
         assertEquals(0, repository.loginCalls.size)
+        compose.field("Mot de passe").performTextInput("chien-oslo-2026")
+        compose.onNodeWithText("Se connecter").assertIsEnabled()
     }
 
     @Test
-    fun `e-mail mal forme bloque sans appel au serveur`() {
-        fillAndSubmit(email = "camille.example.com")
+    fun `mot de passe oublie transmet l'e-mail saisi`() {
+        compose.field("E-mail").performTextInput("camille.martin@example.com")
+        compose.onNodeWithText("Mot de passe oublié ?").performClick()
 
-        compose.onNodeWithText("Indiquez un e-mail valide.").assertIsDisplayed()
-        assertEquals(0, repository.loginCalls.size)
+        assertEquals(listOf("camille.martin@example.com"), forgot)
     }
 
     @Test
@@ -122,8 +129,9 @@ class LoginScreenTest {
 
         compose.onNodeWithText("Se connecter").performClick()
         compose.waitForIdle()
-        // Pendant l'appel, le libellé laisse place à une roue : un second appui ne relance rien.
-        compose.onNodeWithText("Se connecter").assertDoesNotExist()
+        // Pendant l'appel, une roue remplace le libellé : un second appui ne relance rien.
+        compose.onNodeWithText("Se connecter").performClick()
+        compose.waitForIdle()
         assertEquals(1, repository.loginCalls.size)
 
         gate.complete(Unit)

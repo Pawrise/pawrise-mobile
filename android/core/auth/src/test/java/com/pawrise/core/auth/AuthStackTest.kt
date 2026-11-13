@@ -215,6 +215,120 @@ class AuthStackTest {
         assertTrue(repository.login("alex@example.com", "x").failure() is ApiError.Unexpected)
     }
 
+    @Test
+    fun `mot de passe oublie envoie l'e-mail normalise sans Bearer`() = runBlocking {
+        buildStack(initial = Tokens("access-old", "refresh-old"))
+        routes = { MockResponse.Builder().code(204).build() }
+
+        val result = repository.requestPasswordReset("  Alex@Example.com ")
+
+        assertTrue(result is ApiResult.Success)
+        val sent = requestsByPath.single()
+        assertEquals("/auth/forgot-password", sent.url.encodedPath)
+        assertEquals("""{"email":"alex@example.com"}""", sent.body!!.utf8())
+        assertNull(sent.headers["Authorization"])
+    }
+
+    @Test
+    fun `reinitialisation avec le code puis connexion directe`() = runBlocking {
+        buildStack(initial = null)
+        routes = { request ->
+            when (request.url.encodedPath) {
+                "/auth/reset-password" -> MockResponse.Builder().code(204).build()
+                "/auth/login" -> json(200, AUTH_SESSION)
+                else -> json(404, "{}")
+            }
+        }
+
+        val result = repository.resetPassword("alex@example.com", "123456", "nouveau-mot-2026")
+
+        assertTrue(result is ApiResult.Success)
+        assertEquals(
+            """{"email":"alex@example.com","code":"123456","newPassword":"nouveau-mot-2026"}""",
+            requestsByPath.first().body!!.utf8(),
+        )
+        assertEquals("""{"email":"alex@example.com","password":"nouveau-mot-2026"}""", requestsByPath[1].body!!.utf8())
+        assertEquals(Tokens("access-1", "refresh-1"), store.tokens.value)
+    }
+
+    @Test
+    fun `code expire n'ouvre pas de session`() = runBlocking {
+        buildStack(initial = null)
+        routes = { problem(400, ErrorCodes.INVALID_OR_EXPIRED_TOKEN) }
+
+        val problem = repository.resetPassword("alex@example.com", "000000", "nouveau-mot-2026").failure() as ApiError.Problem
+
+        assertEquals(ErrorCodes.INVALID_OR_EXPIRED_TOKEN, problem.code)
+        assertEquals(1, requestsByPath.size)
+        assertNull(store.tokens.value)
+    }
+
+    @Test
+    fun `renvoi du lien de confirmation authentifie`() = runBlocking {
+        buildStack(initial = Tokens("access-1", "refresh-1"))
+        routes = { MockResponse.Builder().code(204).build() }
+
+        assertTrue(repository.resendVerificationEmail() is ApiResult.Success)
+        val sent = requestsByPath.single()
+        assertEquals("/auth/resend-verification", sent.url.encodedPath)
+        assertEquals("Bearer access-1", sent.headers["Authorization"])
+    }
+
+    @Test
+    fun `profil expose emailVerified et alimente le compte courant`() = runBlocking {
+        buildStack(initial = Tokens("access-1", "refresh-1"))
+        routes = { json(200, USER.replace("}", ""","emailVerified":true}""")) }
+
+        val user = (repository.me() as ApiResult.Success).value
+
+        assertTrue(user.emailVerified)
+        assertEquals(user, repository.user.value)
+        assertEquals("Camille Martin", user.fullName)
+    }
+
+    @Test
+    fun `preferences lues puis modifiees champ par champ`() = runBlocking {
+        buildStack(initial = Tokens("access-1", "refresh-1"))
+        routes = { request ->
+            when (request.method) {
+                "GET" -> json(200, """{"deviceLocationSharing":true,"healthNotifications":true,"anonymizedDataSharing":false}""")
+                else -> json(200, """{"deviceLocationSharing":true,"healthNotifications":false,"anonymizedDataSharing":false}""")
+            }
+        }
+
+        assertEquals(Preferences.Defaults, (repository.preferences() as ApiResult.Success).value)
+        val saved = repository.updatePreferences(PreferencesUpdate(healthNotifications = false))
+
+        assertEquals(false, (saved as ApiResult.Success).value.healthNotifications)
+        val patch = requestsByPath.last()
+        assertEquals("PATCH", patch.method)
+        assertEquals("/me/preferences", patch.url.encodedPath)
+        assertEquals("""{"healthNotifications":false}""", patch.body!!.utf8())
+    }
+
+    @Test
+    fun `suppression du compte ferme la session`() = runBlocking {
+        buildStack(initial = Tokens("access-1", "refresh-1"))
+        routes = { MockResponse.Builder().code(204).build() }
+
+        assertTrue(repository.deleteAccount() is ApiResult.Success)
+        assertEquals("DELETE", requestsByPath.single().method)
+        assertEquals("/me", requestsByPath.single().url.encodedPath)
+        assertNull(store.tokens.value)
+        assertEquals(SessionState.SignedOut, repository.session.first())
+    }
+
+    @Test
+    fun `suppression refusee garde la session`() = runBlocking {
+        buildStack(initial = Tokens("access-1", "refresh-1"))
+        routes = { problem(409, ErrorCodes.CHIEF_TRANSFER_REQUIRED) }
+
+        val problem = repository.deleteAccount().failure() as ApiError.Problem
+
+        assertEquals(ErrorCodes.CHIEF_TRANSFER_REQUIRED, problem.code)
+        assertEquals(Tokens("access-1", "refresh-1"), store.tokens.value)
+    }
+
     private fun ApiResult<*>.failure(): ApiError = (this as ApiResult.Failure).error
 
     private companion object {

@@ -5,7 +5,9 @@ import androidx.lifecycle.viewModelScope
 import com.pawrise.core.auth.AuthRepository
 import com.pawrise.core.auth.RegistrationForm
 import com.pawrise.core.network.ApiError
+import com.pawrise.core.network.ApiErrorMessages
 import com.pawrise.core.network.ApiResult
+import com.pawrise.core.network.CredentialRules
 import com.pawrise.core.network.ErrorCodes
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -32,13 +34,34 @@ data class SignupUiState(
     val phone: String = "",
     val password: String = "",
     val termsAccepted: Boolean = false,
-    val fieldErrors: Map<SignupField, String> = emptyMap(),
+    /** Après un premier envoi : les erreurs locales s'affichent (et se mettent à jour à la saisie). */
+    val showErrors: Boolean = false,
+    /** Erreurs par champ renvoyées par le serveur (VALIDATION_FAILED), affichées sous le champ. */
+    val serverErrors: Map<SignupField, String> = emptyMap(),
     val formError: String? = null,
     val loading: Boolean = false,
     val registered: Boolean = false,
-)
+) {
+    /** Contrôles locaux (mêmes textes qu'iOS). */
+    val localErrors: Map<SignupField, String>
+        get() = buildMap {
+            if (firstName.isBlank()) put(SignupField.FirstName, SignupMessages.FIRST_NAME)
+            if (lastName.isBlank()) put(SignupField.LastName, SignupMessages.LAST_NAME)
+            if (!CredentialRules.isValidEmail(email)) put(SignupField.Email, SignupMessages.EMAIL)
+            if (phone.isNotBlank() && toE164(phone.trim()) == null) put(SignupField.Phone, SignupMessages.PHONE)
+            when {
+                password.length < CredentialRules.PASSWORD_MIN_LENGTH -> put(SignupField.Password, SignupMessages.PASSWORD_SHORT)
+                password.length > CredentialRules.PASSWORD_MAX_LENGTH -> put(SignupField.Password, SignupMessages.PASSWORD_LONG)
+            }
+            if (!termsAccepted) put(SignupField.Terms, SignupMessages.TERMS)
+        }
 
-/** US-A · 02 Créer un compte (`POST /auth/register`). Modifs de maquette M1–M3 appliquées. */
+    /** Erreur affichée sous chaque champ : locale après un envoi, sinon celle du serveur. */
+    val fieldErrors: Map<SignupField, String>
+        get() = if (showErrors) serverErrors + localErrors else serverErrors
+}
+
+/** US-A · 02 Créer un compte (`POST /v1/auth/register`). */
 @HiltViewModel
 class SignupViewModel @Inject constructor(private val authRepository: AuthRepository) : ViewModel() {
 
@@ -55,20 +78,13 @@ class SignupViewModel @Inject constructor(private val authRepository: AuthReposi
     fun submit() {
         val s = _state.value
         if (s.loading) return
-        val phone = s.phone.trim().takeIf { it.isNotEmpty() }?.let { toE164(it) }
-        val errors = buildMap {
-            if (s.firstName.isBlank()) put(SignupField.FirstName, SignupMessages.FIRST_NAME)
-            if (s.lastName.isBlank()) put(SignupField.LastName, SignupMessages.LAST_NAME)
-            if (!isValidEmail(s.email)) put(SignupField.Email, AuthMessages.INVALID_EMAIL)
-            if (s.phone.isNotBlank() && phone == null) put(SignupField.Phone, SignupMessages.PHONE)
-            if (s.password.length < MIN_PASSWORD) put(SignupField.Password, SignupMessages.PASSWORD)
-            if (!s.termsAccepted) put(SignupField.Terms, SignupMessages.TERMS)
-        }
-        if (errors.isNotEmpty()) return _state.update { it.copy(fieldErrors = errors, formError = null) }
+        _state.update { it.copy(showErrors = true, serverErrors = emptyMap(), formError = null) }
+        if (s.localErrors.isNotEmpty()) return
 
-        _state.update { it.copy(loading = true, fieldErrors = emptyMap(), formError = null) }
+        _state.update { it.copy(loading = true) }
+        val phone = s.phone.trim().takeIf { it.isNotEmpty() }?.let { toE164(it) }
         viewModelScope.launch {
-            val form = RegistrationForm(s.firstName, s.lastName, s.email, phone, s.password)
+            val form = RegistrationForm(s.firstName, s.lastName, CredentialRules.normalizedEmail(s.email), phone, s.password)
             when (val result = authRepository.register(form)) {
                 is ApiResult.Success -> _state.update { it.copy(loading = false, registered = true) }
                 is ApiResult.Failure -> _state.update { it.withServerError(result.error) }
@@ -77,44 +93,34 @@ class SignupViewModel @Inject constructor(private val authRepository: AuthReposi
     }
 
     private fun edit(field: SignupField, change: SignupUiState.() -> SignupUiState) =
-        _state.update { it.change().copy(fieldErrors = it.fieldErrors - field, formError = null) }
+        _state.update { it.change().copy(serverErrors = it.serverErrors - field, formError = null) }
 
     private fun SignupUiState.withServerError(error: ApiError): SignupUiState {
-        val fields = if (error is ApiError.Problem) error.toFieldErrors() else emptyMap()
+        val fields = (error as? ApiError.Problem)?.toFieldErrors().orEmpty()
         return copy(
             loading = false,
-            fieldErrors = fields,
-            formError = if (fields.isEmpty()) AuthMessages.of(error) else null,
+            serverErrors = fields,
+            formError = if (fields.isEmpty()) ApiErrorMessages.of(error) else null,
         )
-    }
-
-    companion object {
-        const val MIN_PASSWORD = 8
     }
 }
 
 internal object SignupMessages {
     const val FIRST_NAME = "Indiquez votre prénom."
     const val LAST_NAME = "Indiquez votre nom."
-    const val PHONE = "Indiquez un numéro de téléphone valide."
-    const val PASSWORD = "Choisissez un mot de passe d'au moins 8 caractères."
-    const val TERMS = "Acceptez les conditions pour créer votre compte."
-    const val EMAIL_USED = "Un compte existe déjà avec cet e-mail."
+    const val EMAIL = "Saisissez une adresse e-mail valide, par exemple alex@exemple.fr."
+    const val PHONE = "Saisissez un numéro valide, par exemple 06 12 34 56 78."
+    val PASSWORD_SHORT = "Le mot de passe doit faire au moins ${CredentialRules.PASSWORD_MIN_LENGTH} caractères."
+    val PASSWORD_LONG = "Le mot de passe doit faire au plus ${CredentialRules.PASSWORD_MAX_LENGTH} caractères."
+    const val TERMS = "Acceptez les conditions d’utilisation pour continuer."
 }
 
-/** Erreurs serveur → message sous le bon champ (convention 4 : `errors[].field`). */
+/** `VALIDATION_FAILED` → message sous le bon champ, selon le code (PASSWORD_TOO_COMMON, INVALID_PHONE…). */
 private fun ApiError.Problem.toFieldErrors(): Map<SignupField, String> {
-    if (code == ErrorCodes.EMAIL_ALREADY_USED) return mapOf(SignupField.Email to SignupMessages.EMAIL_USED)
     if (code != ErrorCodes.VALIDATION_FAILED) return emptyMap()
     return fieldErrors.mapNotNull { error ->
         val field = SignupField.entries.firstOrNull { it.apiName == error.field } ?: return@mapNotNull null
-        field to when (field) {
-            SignupField.FirstName -> SignupMessages.FIRST_NAME
-            SignupField.LastName -> SignupMessages.LAST_NAME
-            SignupField.Email -> AuthMessages.INVALID_EMAIL
-            SignupField.Phone -> SignupMessages.PHONE
-            SignupField.Password -> SignupMessages.PASSWORD
-            SignupField.Terms -> SignupMessages.TERMS
-        }
+        val message = ApiErrorMessages.field(error.field, error.code) ?: return@mapNotNull null
+        field to message
     }.toMap()
 }

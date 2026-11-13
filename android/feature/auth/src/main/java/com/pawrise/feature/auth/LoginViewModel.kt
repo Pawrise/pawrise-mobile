@@ -3,9 +3,9 @@ package com.pawrise.feature.auth
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.pawrise.core.auth.AuthRepository
-import com.pawrise.core.network.ApiError
+import com.pawrise.core.network.ApiErrorMessages
 import com.pawrise.core.network.ApiResult
-import com.pawrise.core.network.ErrorCodes
+import com.pawrise.core.network.CredentialRules
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,9 +20,12 @@ data class LoginUiState(
     val loading: Boolean = false,
     val error: String? = null,
     val loggedIn: Boolean = false,
-)
+) {
+    /** Comme iOS : bouton actif dès que les deux champs sont remplis. */
+    val canSubmit: Boolean get() = email.isNotBlank() && password.isNotEmpty() && !loading
+}
 
-/** US-J · 02 Connexion (`POST /auth/login`). */
+/** US-J · 02 Connexion (`POST /v1/auth/login`). */
 @HiltViewModel
 class LoginViewModel @Inject constructor(private val authRepository: AuthRepository) : ViewModel() {
 
@@ -35,27 +38,13 @@ class LoginViewModel @Inject constructor(private val authRepository: AuthReposit
 
     fun submit() {
         val current = _state.value
-        if (current.loading) return
-        val error = when {
-            current.email.isBlank() || current.password.isEmpty() -> AuthMessages.FILL_LOGIN
-            !isValidEmail(current.email) -> AuthMessages.INVALID_EMAIL
-            else -> null
-        }
-        if (error != null) return _state.update { it.copy(error = error) }
-
+        if (!current.canSubmit) return
         _state.update { it.copy(loading = true, error = null) }
         viewModelScope.launch {
-            when (val result = authRepository.login(current.email, current.password)) {
+            when (val result = authRepository.login(CredentialRules.normalizedEmail(current.email), current.password)) {
                 is ApiResult.Success -> _state.update { it.copy(loading = false, loggedIn = true) }
-                is ApiResult.Failure -> _state.update { it.copy(loading = false, error = result.error.loginMessage()) }
+                is ApiResult.Failure -> _state.update { it.copy(loading = false, error = ApiErrorMessages.of(result.error)) }
             }
         }
     }
 }
-
-private fun ApiError.loginMessage(): String =
-    if (this is ApiError.Problem && code == ErrorCodes.VALIDATION_FAILED && hasFieldError("email")) {
-        AuthMessages.INVALID_EMAIL
-    } else {
-        AuthMessages.of(this)
-    }

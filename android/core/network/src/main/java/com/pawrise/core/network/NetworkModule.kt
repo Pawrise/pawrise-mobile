@@ -24,6 +24,19 @@ import retrofit2.converter.kotlinx.serialization.asConverterFactory
 @Retention(AnnotationRetention.BINARY)
 annotation class BareClient
 
+/**
+ * Retrofit de pawrise-auth (routes `/v1/auth/…`, `/v1/me…`) : URL distincte de l'API métier
+ * (chiens, races, collier), configurable par `-Ppawrise.authBaseUrl`.
+ */
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class AuthService
+
+/** Retrofit nu (sans Bearer ni refresh) vers pawrise-auth : sert uniquement au refresh des jetons. */
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class BareAuthService
+
 /** Intercepteurs ajoutés au client principal par d'autres modules (ex. `core:auth` → en-tête Bearer). */
 @Qualifier
 @Retention(AnnotationRetention.BINARY)
@@ -78,17 +91,30 @@ object NetworkModule {
         }
         .build()
 
+    /** API métier (chiens, races, collier) : mock Prism tant que la Core API n'existe pas. */
     @Provides
     @Singleton
-    fun provideRetrofit(client: OkHttpClient, json: Json): Retrofit = retrofit(client, json)
+    fun provideRetrofit(client: OkHttpClient, json: Json): Retrofit = retrofit(BuildConfig.API_BASE_URL, client, json)
 
     @Provides
     @Singleton
     @BareClient
-    fun provideBareRetrofit(@BareClient client: OkHttpClient, json: Json): Retrofit = retrofit(client, json)
+    fun provideBareRetrofit(@BareClient client: OkHttpClient, json: Json): Retrofit =
+        retrofit(BuildConfig.API_BASE_URL, client, json)
 
-    private fun retrofit(client: OkHttpClient, json: Json): Retrofit = Retrofit.Builder()
-        .baseUrl(BuildConfig.API_BASE_URL)
+    @Provides
+    @Singleton
+    @AuthService
+    fun provideAuthRetrofit(client: OkHttpClient, json: Json): Retrofit = retrofit(BuildConfig.AUTH_BASE_URL, client, json)
+
+    @Provides
+    @Singleton
+    @BareAuthService
+    fun provideBareAuthRetrofit(@BareClient client: OkHttpClient, json: Json): Retrofit =
+        retrofit(BuildConfig.AUTH_BASE_URL, client, json)
+
+    private fun retrofit(baseUrl: String, client: OkHttpClient, json: Json): Retrofit = Retrofit.Builder()
+        .baseUrl(baseUrl)
         .client(client)
         .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
         .build()

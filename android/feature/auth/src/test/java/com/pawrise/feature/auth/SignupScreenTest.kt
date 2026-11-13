@@ -2,6 +2,7 @@ package com.pawrise.feature.auth
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -52,9 +53,9 @@ class SignupScreenTest {
         type("Prénom", " Camille ")
         type("Nom", "Martin")
         type("E-mail", "camille.martin@example.com")
-        if (phone.isNotEmpty()) type("Téléphone (facultatif)", phone)
+        if (phone.isNotEmpty()) type("Téléphone", phone)
         type("Mot de passe", "chien-oslo-2026")
-        tap("J'accepte les conditions d'utilisation et la politique de confidentialité.")
+        tap("J’accepte les conditions d’utilisation et la politique de confidentialité de Pawrise.")
     }
 
     @Test
@@ -84,9 +85,9 @@ class SignupScreenTest {
 
         see("Indiquez votre prénom.")
         see("Indiquez votre nom.")
-        see("Indiquez un e-mail valide.")
-        see("Choisissez un mot de passe d'au moins 8 caractères.")
-        see("Acceptez les conditions pour créer votre compte.")
+        see("Saisissez une adresse e-mail valide, par exemple alex@exemple.fr.")
+        see("Le mot de passe doit faire au moins 8 caractères.")
+        see("Acceptez les conditions d’utilisation pour continuer.")
         assertTrue(repository.registerCalls.isEmpty())
     }
 
@@ -96,10 +97,10 @@ class SignupScreenTest {
         type("Nom", "Martin")
         type("E-mail", "camille.martin@example.com")
         type("Mot de passe", "chien12")
-        tap("J'accepte les conditions d'utilisation et la politique de confidentialité.")
+        tap("J’accepte les conditions d’utilisation et la politique de confidentialité de Pawrise.")
         tap("Continuer")
 
-        see("Choisissez un mot de passe d'au moins 8 caractères.")
+        see("Le mot de passe doit faire au moins 8 caractères.")
         assertTrue(repository.registerCalls.isEmpty())
     }
 
@@ -111,7 +112,7 @@ class SignupScreenTest {
         type("Mot de passe", "chien-oslo-2026")
         tap("Continuer")
 
-        see("Acceptez les conditions pour créer votre compte.")
+        see("Acceptez les conditions d’utilisation pour continuer.")
         assertTrue(repository.registerCalls.isEmpty())
     }
 
@@ -120,21 +121,47 @@ class SignupScreenTest {
         fillValid(phone = "06 12")
         tap("Continuer")
 
-        see("Indiquez un numéro de téléphone valide.")
+        see("Saisissez un numéro valide, par exemple 06 12 34 56 78.")
         assertTrue(repository.registerCalls.isEmpty())
     }
 
     @Test
-    fun `e-mail deja utilise affiche sous le champ puis s'efface a la correction`() {
+    fun `e-mail deja utilise affiche un bandeau qui s'efface a la correction`() {
         repository.registerResult = FakeAuthRepository.problem(409, ErrorCodes.EMAIL_ALREADY_USED)
         fillValid()
         tap("Continuer")
 
-        see("Un compte existe déjà avec cet e-mail.")
+        see("Un compte existe déjà avec cette adresse. Connectez-vous plutôt.")
         assertEquals(0, registered)
 
         type("E-mail", "x")
-        compose.onNodeWithText("Un compte existe déjà avec cet e-mail.").assertDoesNotExist()
+        compose.onNodeWithText("Un compte existe déjà avec cette adresse. Connectez-vous plutôt.").assertDoesNotExist()
+    }
+
+    @Test
+    fun `mot de passe trop courant ou divulgue explique sous le champ`() {
+        repository.registerResult = FakeAuthRepository.problem(400, ErrorCodes.VALIDATION_FAILED, "password" to ErrorCodes.PASSWORD_TOO_COMMON)
+        fillValid()
+        tap("Continuer")
+        see("Ce mot de passe est trop courant. Choisissez-en un plus personnel.")
+
+        repository.registerResult = FakeAuthRepository.problem(400, ErrorCodes.VALIDATION_FAILED, "password" to ErrorCodes.PASSWORD_BREACHED)
+        tap("Continuer")
+        see("Ce mot de passe apparaît dans une fuite de données connue. Choisissez-en un autre.")
+
+        repository.registerResult = FakeAuthRepository.problem(400, ErrorCodes.VALIDATION_FAILED, "password" to ErrorCodes.PASSWORD_TOO_LONG)
+        tap("Continuer")
+        see("Le mot de passe doit faire au plus 128 caractères.")
+    }
+
+    @Test
+    fun `cgu refusees par le serveur`() {
+        repository.registerResult =
+            FakeAuthRepository.problem(400, ErrorCodes.VALIDATION_FAILED, "acceptedTermsVersion" to ErrorCodes.TERMS_NOT_ACCEPTED)
+        fillValid()
+        tap("Continuer")
+
+        see("Acceptez les conditions d'utilisation pour continuer.")
     }
 
     @Test
@@ -148,8 +175,8 @@ class SignupScreenTest {
         fillValid()
         tap("Continuer")
 
-        see("Indiquez un numéro de téléphone valide.")
-        see("Choisissez un mot de passe d'au moins 8 caractères.")
+        see("Saisissez un numéro valide, par exemple 06 12 34 56 78.")
+        see("Le mot de passe doit faire au moins 8 caractères.")
     }
 
     @Test
@@ -158,14 +185,14 @@ class SignupScreenTest {
         fillValid()
         tap("Continuer")
 
-        see("Connexion impossible. Vérifiez votre réseau et réessayez.")
+        see("Impossible de joindre le serveur. Réessayez dans un instant.")
         assertEquals(0, registered)
     }
 
     @Test
     fun `liens Retour et J'ai deja un compte`() {
-        tap("Retour")
-        tap("J'ai déjà un compte")
+        compose.onNodeWithContentDescription("Retour").performClick()
+        tap("J’ai déjà un compte")
 
         assertEquals(1, back)
         assertEquals(1, login)
