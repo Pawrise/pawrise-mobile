@@ -9,7 +9,7 @@ plugins {
 // pawrise-assistant (POST /v1/turns/stream, SSE). Par défaut : en local via `adb reverse tcp:8100 tcp:8100`.
 // Surcharge : `-Ppawrise.assistantBaseUrl=https://…/` (et `-Ppawrise.assistantPetRef=…`).
 val assistantBaseUrl = providers.gradleProperty("pawrise.assistantBaseUrl").getOrElse("http://localhost:8100/")
-val assistantPetRef = providers.gradleProperty("pawrise.assistantPetRef").getOrElse("pet_demo_nala")
+val assistantPetRef = providers.gradleProperty("pawrise.assistantPetRef").getOrElse("")
 
 android {
     namespace = "com.pawrise.feature.chat"

@@ -10,6 +10,7 @@ import com.pawrise.core.pets.PhotoFile
 import com.pawrise.core.pets.SamplePhoto
 import com.pawrise.core.pets.Sex
 import com.pawrise.core.pets.normalizeCollarCode
+import com.pawrise.core.pets.scenario.HealthScenario
 import kotlinx.coroutines.CompletableDeferred
 
 /** Faux [PetRepository] scriptable, qui garde trace de ce que l'app envoie. */
@@ -27,6 +28,7 @@ class FakePetRepository(var pets: List<Pet> = listOf(NALA)) : PetRepository {
     val uploadedPhotos = mutableListOf<Pair<String, PhotoFile>>()
     val breedQueries = mutableListOf<String>()
     val collars = mutableListOf<Pair<String, String>>()
+    val scenarios = mutableListOf<Pair<String, HealthScenario>>()
 
     override suspend fun listPets(): ApiResult<List<Pet>> = listResult ?: ApiResult.Success(pets)
 
@@ -57,6 +59,11 @@ class FakePetRepository(var pets: List<Pet> = listOf(NALA)) : PetRepository {
         collars += petId to serialNumber
         gate?.await()
         return collarResult ?: ApiResult.Success(Collar(normalizeCollarCode(serialNumber), "C2", null, false))
+    }
+
+    override suspend fun setSimulatedScenario(petId: String, scenario: HealthScenario): ApiResult<Unit> {
+        scenarios += petId to scenario
+        return ApiResult.Success(Unit)
     }
 
     companion object {

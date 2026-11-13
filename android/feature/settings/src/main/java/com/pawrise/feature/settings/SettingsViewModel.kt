@@ -123,7 +123,12 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    fun selectScenario(scenario: HealthScenario) = scenarioStore.select(scenario)
+    /** Change le scénario tout de suite dans l'app, puis côté serveur pour chaque chien (le chatbot lit ce dernier). */
+    fun selectScenario(scenario: HealthScenario) {
+        scenarioStore.select(scenario)
+        val pets = _state.value.pets
+        viewModelScope.launch { pets.forEach { petRepository.setSimulatedScenario(it.id, scenario) } }
+    }
 
     fun resendVerification() {
         if (_state.value.sendingVerification) return

@@ -9,11 +9,14 @@ import com.pawrise.core.pets.data.CreatePetRequest
 import com.pawrise.core.pets.data.PetApi
 import com.pawrise.core.pets.data.PetDto
 import com.pawrise.core.pets.data.SamplePhotoRequest
+import com.pawrise.core.pets.data.ScenarioRequest
 import com.pawrise.core.pets.data.SetCollarRequest
+import com.pawrise.core.pets.scenario.HealthScenario
 import java.time.LocalDate
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.serialization.json.Json
+import retrofit2.HttpException
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -84,6 +87,9 @@ interface PetRepository {
 
     /** Associe (ou remplace) le collier ; [serialNumber] tel que scanné ou saisi. */
     suspend fun setCollar(petId: String, serialNumber: String): ApiResult<Collar>
+
+    /** Données simulées : aligne le scénario du serveur (lu par le chatbot) sur celui choisi dans l'app. */
+    suspend fun setSimulatedScenario(petId: String, scenario: HealthScenario): ApiResult<Unit>
 }
 
 @Singleton
@@ -120,6 +126,11 @@ class DefaultPetRepository @Inject constructor(private val api: PetApi, private 
 
     override suspend fun searchBreeds(query: String) =
         apiCall(json) { api.listBreeds(query.trim().takeIf { it.isNotEmpty() }).items.map { it.toDomain() } }
+
+    override suspend fun setSimulatedScenario(petId: String, scenario: HealthScenario) = apiCall(json) {
+        val response = api.setScenario(petId, ScenarioRequest(if (scenario == HealthScenario.Anomaly) "anomaly" else "normal"))
+        if (!response.isSuccessful) throw HttpException(response)
+    }
 
     override suspend fun setCollar(petId: String, serialNumber: String): ApiResult<Collar> =
         apiCall(json) { api.setCollar(petId, SetCollarRequest(normalizeCollarCode(serialNumber))) }.map { it.toDomain() }

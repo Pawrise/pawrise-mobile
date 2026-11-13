@@ -1,6 +1,7 @@
 package com.pawrise.core.pets.data
 
 import okhttp3.MultipartBody
+import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.Multipart
@@ -29,4 +30,8 @@ interface PetApi {
 
     @PUT("pets/{petId}/collar")
     suspend fun setCollar(@Path("petId") petId: String, @Body body: SetCollarRequest): CollarDto
+
+    /** Route de dev d'API-CORE (hors contrat) : scénario des données de santé simulées du chien. */
+    @PUT("dev/pets/{petId}/scenario")
+    suspend fun setScenario(@Path("petId") petId: String, @Body body: ScenarioRequest): Response<Unit>
 }

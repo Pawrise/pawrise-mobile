@@ -79,7 +79,8 @@ class HomeFlowTest {
         val question = "Le rythme cardiaque de Nala est inhabituellement élevé depuis 45 minutes. Que dois-je faire ?"
         compose.onNodeWithContentDescription("Vous : $question").assertIsDisplayed()
         assertEquals(question, (assistant as ScriptedAssistantService).requests.single().userMessage)
-        assertEquals("pet_demo_nala", assistant.requests.single().petRef)
+        // Le chatbot lit le chien affiché via API-CORE : pet_ref = son identifiant.
+        assertEquals(FakePetRepository.NALA.id, assistant.requests.single().petRef)
     }
 
     @Test

@@ -47,6 +47,9 @@ data class SamplePhotoRequest(val sample: String)
 data class SetCollarRequest(val serialNumber: String)
 
 @Serializable
+data class ScenarioRequest(val scenario: String)
+
+@Serializable
 data class CollarDto(
     val serialNumber: String,
     val model: String,

@@ -6,9 +6,9 @@ plugins {
 }
 
 // URL de base de l'API (chemins du contrat relatifs : « auth/login »…). Prod : https://…/v1/ (convention 7).
-// Par défaut : le mock Prism du docker compose, joint via `adb reverse tcp:4010 tcp:4010`.
+// API-CORE en local (port 3000, joint via `adb reverse tcp:3000 tcp:3000`).
 // Surcharge : `./gradlew assembleDebug -Ppawrise.apiBaseUrl=https://…/` ou dans ~/.gradle/gradle.properties.
-val apiBaseUrl = providers.gradleProperty("pawrise.apiBaseUrl").getOrElse("http://localhost:4010/")
+val apiBaseUrl = providers.gradleProperty("pawrise.apiBaseUrl").getOrElse("http://localhost:3000/v1/")
 
 // URL de base de pawrise-auth (routes /v1/auth/* et /v1/me*), chemins relatifs « auth/login », « me »… :
 // l'URL se termine donc par « /v1/ ». Par défaut le service lancé en local (port 8200, comme iOS),

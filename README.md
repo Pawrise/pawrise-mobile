@@ -16,10 +16,14 @@ Puis lance Android Studio, laisse l'assistant installer le SDK, ouvre le dossier
 
 ### 2. Backend local
 
-| Mode | Commande | URL vue par l'app |
+| Service | Commande | URL vue par l'app |
 |---|---|---|
-| Mock (défaut) | `docker compose up -d` puis `./scripts/dev-reverse.sh` | `http://localhost:4010/` |
-| API réelle | selon l'équipe backend, puis `adb reverse` sur son port | `-Ppawrise.apiBaseUrl=http://localhost:<port>/v1/` |
+| API-CORE (chiens, photos, collier, santé) | dans `pawrise-api-core` : `docker compose up -d`, migrations, `npm run dev` | `http://localhost:3000/v1/` (défaut) |
+| pawrise-auth (comptes) | dans `pawrise-auth` : `npm run dev` | `http://localhost:8200/v1/` (défaut) |
+| pawrise-assistant (Chat IA) | dans `pawrise-assistant` : `uv run dev`, avec `PAWRISE_CORE_API_URL=http://localhost:3000/internal` | `http://localhost:8100/` (défaut) |
+
+Puis `./scripts/dev-reverse.sh` rend ces ports joignables depuis l'émulateur ou le téléphone branché.
+Le mock Prism (`docker compose up -d`, port 4010) ne sert plus qu'aux tests de contrat : `-Ppawrise.apiBaseUrl=http://localhost:4010/` pour y brancher l'app.
 
 Le mock (Prism) sert `api/openapi.yaml`, copie du contrat qui fait foi : `pawrise-doc/contrat-interface/openapi.yaml` (`./scripts/sync-contract.sh` la met à jour). Il **valide les requêtes** : un champ mal nommé ou manquant est refusé. Pour tester un état d'erreur d'écran, ajoute l'en-tête `Prefer` :
 
