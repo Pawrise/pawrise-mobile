@@ -9,7 +9,8 @@ import com.pawrise.core.auth.session.EncryptedTokenStore
 import com.pawrise.core.auth.session.TokenAuthenticator
 import com.pawrise.core.auth.session.TokenStore
 import com.pawrise.core.network.AppInterceptors
-import com.pawrise.core.network.BareClient
+import com.pawrise.core.network.AuthService
+import com.pawrise.core.network.BareAuthService
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -45,9 +46,9 @@ abstract class AuthBindings {
 object AuthModule {
     @Provides
     @Singleton
-    fun authApi(retrofit: Retrofit): AuthApi = retrofit.create()
+    fun authApi(@AuthService retrofit: Retrofit): AuthApi = retrofit.create()
 
     @Provides
     @Singleton
-    fun refreshApi(@BareClient retrofit: Retrofit): RefreshApi = retrofit.create()
+    fun refreshApi(@BareAuthService retrofit: Retrofit): RefreshApi = retrofit.create()
 }

@@ -14,7 +14,13 @@ private const val AUTHORIZATION = "Authorization"
  * Routes publiques du contrat (convention 6) : jamais de Bearer. Indispensable pour `login` :
  * un 401 INVALID_CREDENTIALS ne doit pas déclencher de refresh.
  */
-private val PUBLIC_PATHS = listOf("/auth/register", "/auth/login", "/auth/refresh")
+private val PUBLIC_PATHS = listOf(
+    "/auth/register",
+    "/auth/login",
+    "/auth/refresh",
+    "/auth/forgot-password",
+    "/auth/reset-password",
+)
 
 private fun Request.isPublic(): Boolean = PUBLIC_PATHS.any { url.encodedPath.endsWith(it) }
 

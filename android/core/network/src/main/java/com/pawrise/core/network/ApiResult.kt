@@ -52,12 +52,22 @@ object ErrorCodes {
     const val PET_NOT_FOUND = "PET_NOT_FOUND"
     const val FILE_TOO_LARGE = "FILE_TOO_LARGE"
     const val COLLAR_ALREADY_ASSIGNED = "COLLAR_ALREADY_ASSIGNED"
+    const val UNAUTHORIZED = "UNAUTHORIZED"
+
+    // pawrise-auth (ECARTS.md) : mot de passe oublié, suppression du compte
+    const val INVALID_OR_EXPIRED_TOKEN = "INVALID_OR_EXPIRED_TOKEN"
+    const val CHIEF_TRANSFER_REQUIRED = "CHIEF_TRANSFER_REQUIRED"
 
     // Codes par champ (errors[].code)
     const val REQUIRED = "REQUIRED"
     const val INVALID_EMAIL = "INVALID_EMAIL"
     const val INVALID_PHONE = "INVALID_PHONE"
     const val PASSWORD_TOO_SHORT = "PASSWORD_TOO_SHORT"
+    const val PASSWORD_TOO_LONG = "PASSWORD_TOO_LONG"
+    const val PASSWORD_TOO_COMMON = "PASSWORD_TOO_COMMON"
+    const val PASSWORD_BREACHED = "PASSWORD_BREACHED"
+    const val INVALID_CODE = "INVALID_CODE"
+    const val TOO_LONG = "TOO_LONG"
     const val TERMS_NOT_ACCEPTED = "TERMS_NOT_ACCEPTED"
     const val BIRTH_DATE_IN_FUTURE = "BIRTH_DATE_IN_FUTURE"
     const val MUST_BE_POSITIVE = "MUST_BE_POSITIVE"

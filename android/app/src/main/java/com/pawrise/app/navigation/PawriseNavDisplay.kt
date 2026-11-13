@@ -10,6 +10,7 @@ import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
 import com.pawrise.core.auth.SessionState
+import com.pawrise.feature.auth.ForgotPasswordRoute
 import com.pawrise.feature.auth.LoginRoute
 import com.pawrise.feature.auth.SignupRoute
 import com.pawrise.feature.auth.WelcomeRoute
@@ -33,7 +34,8 @@ fun PawriseNavDisplay(
     // Session perdue (refresh refusé, déconnexion) → retour à Bienvenue, historique vidé.
     LaunchedEffect(session) {
         session.collect { state ->
-            if (state == SessionState.SignedOut && backStack.lastOrNull() !in AUTH_DESTINATIONS) {
+            val top = backStack.lastOrNull()
+            if (state == SessionState.SignedOut && top !in AUTH_DESTINATIONS && top !is ForgotPassword) {
                 backStack.resetTo(Welcome)
             }
         }
@@ -59,6 +61,14 @@ fun PawriseNavDisplay(
                     onBack = { backStack.removeLastOrNull() },
                     onSignup = { backStack.replaceTop(Signup) },
                     onLoggedIn = { scope.launch { backStack.resetTo(destinationAfterSignIn()) } },
+                    onForgotPassword = { email -> backStack.add(ForgotPassword(email)) },
+                )
+            }
+            entry<ForgotPassword> { key ->
+                ForgotPasswordRoute(
+                    initialEmail = key.email,
+                    onBack = { backStack.removeLastOrNull() },
+                    onSignedIn = { scope.launch { backStack.resetTo(destinationAfterSignIn()) } },
                 )
             }
             entry<Signup> {

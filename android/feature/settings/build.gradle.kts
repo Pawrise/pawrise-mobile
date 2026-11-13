@@ -5,16 +5,25 @@ plugins {
     alias(libs.plugins.hilt)
 }
 
+// Pages publiques des CGU et de la politique de confidentialité (Paramètres → Légal).
+// Vides tant qu'elles ne sont pas publiées : la ligne l'indique au lieu d'ouvrir une page vide.
+// `-Ppawrise.termsUrl=https://…` / `-Ppawrise.privacyUrl=https://…` ou ~/.gradle/gradle.properties.
+val termsUrl = providers.gradleProperty("pawrise.termsUrl").getOrElse("")
+val privacyUrl = providers.gradleProperty("pawrise.privacyUrl").getOrElse("")
+
 android {
     namespace = "com.pawrise.feature.settings"
     compileSdk = 37
 
     defaultConfig {
         minSdk = 26
+        buildConfigField("String", "TERMS_URL", "\"$termsUrl\"")
+        buildConfigField("String", "PRIVACY_URL", "\"$privacyUrl\"")
     }
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     testOptions {
@@ -33,14 +42,15 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.hilt.lifecycle.viewmodel.compose)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.coil.compose) // photo du chien
     debugImplementation(libs.compose.ui.tooling)
-
 
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
 
     testImplementation(libs.junit)
     testImplementation(project(":core:testing"))
+    testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.test.core)
     testImplementation(platform(libs.compose.bom))

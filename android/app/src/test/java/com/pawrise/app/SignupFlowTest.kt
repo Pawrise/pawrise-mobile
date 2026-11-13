@@ -46,7 +46,7 @@ class SignupFlowTest {
         compose.field("Nom").performTextInput("Martin")
         compose.field("E-mail").performTextInput("camille.martin@example.com")
         compose.field("Mot de passe").performScrollTo().performTextInput("chien-oslo-2026")
-        compose.tap("J'accepte les conditions d'utilisation et la politique de confidentialité.")
+        compose.tap("J’accepte les conditions d’utilisation et la politique de confidentialité de Pawrise.")
         compose.tap("Continuer")
     }
 
@@ -116,7 +116,7 @@ class SignupFlowTest {
     @Test
     fun `j'ai deja un compte mene a la connexion`() {
         compose.tap("Créer un compte")
-        compose.tap("J'ai déjà un compte")
+        compose.tap("J’ai déjà un compte")
 
         compose.onNodeWithText("Connexion").assertIsDisplayed()
     }
