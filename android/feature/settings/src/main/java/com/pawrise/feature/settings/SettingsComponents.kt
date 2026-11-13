@@ -80,7 +80,7 @@ internal fun SettingsSectionTitle(title: String) {
     Text(
         title.uppercase(),
         style = pwText(12f, FontWeight.SemiBold, PwColors.TextMuted, lineHeight = 1.4f),
-        modifier = Modifier.padding(start = 1.dp, bottom = 19.dp).semantics { heading() },
+        modifier = Modifier.padding(start = 1.dp, bottom = 19.5.dp).semantics { heading() },
     )
 }
 
@@ -101,7 +101,7 @@ internal fun SettingsDivider() {
     Box(Modifier.fillMaxWidth().padding(start = 64.dp).height(1.dp).background(PwColors.Border))
 }
 
-/** Icône de ligne (20, trait 1,9, couleur atténuée), sans pastille comme dans la maquette. */
+/** Icône de ligne (18, trait 1,9, couleur atténuée), sans pastille comme dans la maquette. */
 @Composable
 internal fun SettingsIcon(icon: ImageVector) {
     Box(Modifier.size(width = 16.dp, height = 20.dp), contentAlignment = Alignment.Center) {
@@ -109,8 +109,8 @@ internal fun SettingsIcon(icon: ImageVector) {
             icon,
             contentDescription = null,
             tint = PwColors.TextMuted,
-            // 20 de large dans une colonne de 16, comme iOS (le tracé déborde de 2 de chaque côté).
-            modifier = Modifier.requiredSize(20.dp),
+            // 18 de large dans une colonne de 16 (le tracé déborde de 1 de chaque côté), mesuré sur I02.
+            modifier = Modifier.requiredSize(18.dp),
         )
     }
 }

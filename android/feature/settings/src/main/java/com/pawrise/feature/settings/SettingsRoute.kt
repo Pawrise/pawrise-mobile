@@ -126,7 +126,7 @@ internal fun SettingsScreen(
         Text(
             "Paramètres",
             style = pwText(26f, FontWeight.Bold, lineHeight = 1.2f, family = BricolageGrotesque),
-            modifier = Modifier.padding(top = 14.dp, bottom = 20.dp).semantics { heading() },
+            modifier = Modifier.padding(top = 16.dp, bottom = 21.5.dp).semantics { heading() },
         )
 
         state.user?.let { user ->
@@ -137,11 +137,11 @@ internal fun SettingsScreen(
 
         SettingsSectionTitle("Confidentialité")
         PrivacySection(state, onToggle, onRetryPrivacy)
-        Spacer(Modifier.height(21.dp))
+        Spacer(Modifier.height(19.dp))
 
         SettingsSectionTitle("Légal")
         LegalSection(termsUrl, privacyUrl)
-        Spacer(Modifier.height(21.dp))
+        Spacer(Modifier.height(19.dp))
 
         if (state.pets.isNotEmpty()) {
             SettingsSectionTitle("Mes chiens")
@@ -151,7 +151,7 @@ internal fun SettingsScreen(
                     DogRow(pet)
                 }
             }
-            Spacer(Modifier.height(21.dp))
+            Spacer(Modifier.height(19.dp))
         }
 
         SettingsSectionTitle("Données simulées")
@@ -215,7 +215,7 @@ private fun AccountCard(user: User, sending: Boolean, message: String?, onResend
             ) {
                 Text(initials(user.fullName), style = pwText(19f, FontWeight.Bold, PwColors.ActionText, lineHeight = 1.2f))
             }
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(user.fullName, style = pwText(16f, FontWeight.Bold), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(user.email, style = pwText(12.5f, color = PwColors.TextMuted), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 user.phoneNumber?.let { Text(it, style = pwText(12.5f, color = PwColors.TextMuted), maxLines = 1) }
@@ -308,7 +308,7 @@ private fun PrivacyRow(
     ) {
         Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
             SettingsIcon(icon)
-            Column {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(title, style = pwText(14f))
                 Text(detail, style = pwText(11.5f, color = PwColors.TextMuted))
             }
