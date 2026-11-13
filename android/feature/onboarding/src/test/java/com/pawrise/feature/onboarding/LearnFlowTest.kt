@@ -2,12 +2,13 @@ package com.pawrise.feature.onboarding
 
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeLeft
 import com.pawrise.core.designsystem.theme.PawriseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Before
@@ -77,15 +78,31 @@ class LearnFlowTest {
     }
 
     @Test
-    fun `pastilles - revenir sur une etape vue, pas sauter en avant`() {
+    fun `pastilles - aller directement a une etape, comme sur iOS`() {
         tap("Suivant")
         tap("Suivant")
-
-        compose.onNodeWithText("Position").assertIsNotEnabled()
         compose.onNodeWithText("Mesures").assertIsSelected()
 
         tap("App")
         compose.onNodeWithText("Pawrise veille sur votre chien").assertIsDisplayed()
+
+        tap("Position")
+        compose.onNodeWithText("Suivez sa position").assertIsDisplayed()
+        compose.onNodeWithText("Connecter le collier").assertIsDisplayed()
         assertEquals(0, done)
+    }
+
+    @Test
+    fun `balayer change d'etape`() {
+        compose.onNodeWithText("Pawrise veille sur votre chien").performTouchInput { swipeLeft() }
+        compose.waitForIdle()
+        compose.onNodeWithText("Étape 2 sur 5").assertIsDisplayed()
+        compose.onNodeWithText("Allumez le collier").assertIsDisplayed()
+    }
+
+    @Test
+    fun `apostrophes droites de la maquette`() {
+        compose.onNodeWithText("Le collier mesure sa santé et indique où il se trouve. Vous consultez tout dans l'application.")
+            .assertIsDisplayed()
     }
 }

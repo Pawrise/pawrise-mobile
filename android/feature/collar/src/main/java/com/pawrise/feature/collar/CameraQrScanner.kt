@@ -8,6 +8,7 @@ import androidx.camera.mlkit.vision.MlKitAnalyzer
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.view.LifecycleCameraController
 import androidx.camera.view.PreviewView
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -32,6 +33,7 @@ import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.pawrise.core.designsystem.theme.PwColors
+import com.pawrise.core.designsystem.theme.PwText
 
 /** Aperçu caméra qui lit les QR codes (ML Kit embarqué) ; demande l'autorisation si besoin. */
 @Composable
@@ -49,8 +51,14 @@ fun CameraQrScanner(onQrCode: (String) -> Unit, modifier: Modifier = Modifier) {
 
     when {
         granted -> CameraPreview(onQrCode, modifier)
-        denied -> Box(modifier, contentAlignment = Alignment.Center) {
-            Text(CollarMessages.CAMERA_DENIED, color = PwColors.ActionText, textAlign = TextAlign.Center, modifier = Modifier.padding(16.dp))
+        denied -> Box(modifier.background(PwColors.SurfaceElevated), contentAlignment = Alignment.Center) {
+            Text(
+                CollarMessages.CAMERA_DENIED,
+                style = PwText.inter(13.5f),
+                color = PwColors.TextMuted,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(16.dp),
+            )
         }
         else -> Box(modifier)
     }

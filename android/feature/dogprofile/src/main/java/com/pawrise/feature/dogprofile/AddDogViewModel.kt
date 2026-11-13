@@ -61,8 +61,8 @@ data class AddDogUiState(
             AddDogStep.Name -> name.isNotBlank()
             AddDogStep.Sex -> sex != null
             AddDogStep.BirthDate -> parseBirthDate(birthDigits) != BirthDate.Invalid
-            AddDogStep.Weight -> parseMeasurement(weight) != Measurement.Invalid
-            AddDogStep.Height -> parseMeasurement(height) != Measurement.Invalid
+            AddDogStep.Weight -> parseWeight(weight) != Measurement.Invalid
+            AddDogStep.Height -> parseHeight(height) != Measurement.Invalid
             else -> true
         }
 }
@@ -80,6 +80,7 @@ class AddDogViewModel @Inject constructor(
     private val _state = MutableStateFlow(AddDogUiState())
     val state: StateFlow<AddDogUiState> = _state.asStateFlow()
     private var breedSearch: Job? = null
+    private var editingFromSummary = false
 
     fun onSample(sample: SamplePhoto) = _state.update { it.copy(photo = PhotoChoice.Sample(sample), photoError = null) }
     fun onOwnPhoto(uri: String) = _state.update { it.copy(photo = PhotoChoice.Own(uri), photoError = null) }
@@ -103,19 +104,34 @@ class AddDogViewModel @Inject constructor(
         val s = _state.value
         if (!s.canContinue || s.saving) return
         if (s.step == AddDogStep.Summary) return save()
+        if (editingFromSummary) {
+            editingFromSummary = false
+            return goTo(AddDogStep.Summary)
+        }
         goTo(AddDogStep.entries[s.step.ordinal + 1])
     }
 
     /** `false` à la première étape : l'écran laisse alors partir l'utilisateur. */
     fun back(): Boolean {
         val s = _state.value
-        if (s.step == AddDogStep.Photo || s.saving) return false
+        if (s.saving) return false
+        // Correction depuis le récapitulatif (comme iOS) : retour au récapitulatif si la valeur est valide.
+        if (editingFromSummary && s.canContinue) {
+            editingFromSummary = false
+            goTo(AddDogStep.Summary)
+            return true
+        }
+        if (s.step == AddDogStep.Photo) return false
         goTo(AddDogStep.entries[s.step.ordinal - 1])
         return true
     }
 
-    /** Depuis le récapitulatif : revenir sur une étape pour la corriger. */
-    fun edit(step: AddDogStep) = goTo(step)
+    /** Depuis le récapitulatif : ouvrir une étape pour la corriger ; « Suivant » ramène au récapitulatif. */
+    fun edit(step: AddDogStep) {
+        if (step == AddDogStep.Summary) return
+        editingFromSummary = true
+        goTo(step)
+    }
 
     private fun goTo(step: AddDogStep) {
         _state.update { it.copy(step = step, saveError = null) }
@@ -141,8 +157,8 @@ class AddDogViewModel @Inject constructor(
             birthDate = (parseBirthDate(s.birthDigits) as? BirthDate.Valid)?.date,
             sex = s.sex ?: Sex.Unknown,
             breeds = (s.breed as? BreedChoice.Known)?.let { listOf(it.breed) } ?: emptyList(),
-            weightKg = (parseMeasurement(s.weight) as? Measurement.Valid)?.value,
-            heightCm = (parseMeasurement(s.height) as? Measurement.Valid)?.value,
+            weightKg = (parseWeight(s.weight) as? Measurement.Valid)?.value,
+            heightCm = (parseHeight(s.height) as? Measurement.Valid)?.value,
             medicalNotes = s.medical.trim().ifEmpty { null },
         )
         _state.update { it.copy(saving = true, saveError = null) }
@@ -182,6 +198,9 @@ class AddDogViewModel @Inject constructor(
 
 internal object AddDogMessages {
     const val INVALID_VALUE = "Renseignez une valeur valide pour continuer."
+    const val BIRTH_INVALID = "Indiquez une date réelle, au format JJ / MM / AAAA, dans les $MAX_AGE_YEARS dernières années."
+    const val WEIGHT_INVALID = "Indiquez un poids entre 0 et 120 kg."
+    const val HEIGHT_INVALID = "Indiquez une taille entre 1 et 120 cm."
     const val PHOTO_UNREADABLE = "Impossible d'utiliser cette photo. Choisissez-en une autre."
     const val BREEDS_FAILED = "Impossible de charger les races."
     const val BIRTH_FUTURE = "La date de naissance ne peut pas être dans le futur."

@@ -123,7 +123,6 @@ class AddDogFlowTest {
         start()
         next() // photo facultative
         compose.onNodeWithText("Suivant").assertIsNotEnabled()
-        see("Renseignez une valeur valide pour continuer.")
         type("Nom du chien", "Rio")
         next()
         next() // date facultative
@@ -157,19 +156,53 @@ class AddDogFlowTest {
     }
 
     @Test
-    fun `je ne sais pas envoie une race inconnue`() {
+    fun `race facultative - sans choix, aucune race envoyee`() {
         start()
         next()
         type("Nom du chien", "Rio")
         next(); next()
         tap("Mâle")
         next()
-        tap("Je ne sais pas")
         repeat(4) { next() }
-        see("Je ne sais pas")
+        see("Le profil de Rio")
         tap("Continuer")
 
         assertEquals(emptyList<Breed>(), pets.created.single().breeds)
+    }
+
+    @Test
+    fun `date hors limites - message de la maquette iOS`() {
+        start()
+        next()
+        type("Nom du chien", "Nala")
+        next()
+        type("Date de naissance", "01011950")
+        see("Indiquez une date réelle, au format JJ / MM / AAAA, dans les 30 dernières années.")
+        compose.onNodeWithText("Suivant").assertIsNotEnabled()
+    }
+
+    @Test
+    fun `poids au-dela de 120 kg refuse`() {
+        start()
+        next()
+        type("Nom du chien", "Nala")
+        next(); next()
+        tap("Femelle")
+        next(); next()
+        type("Poids en kilogrammes", "130")
+        see("Indiquez un poids entre 0 et 120 kg.")
+        compose.onNodeWithText("Suivant").assertIsNotEnabled()
+    }
+
+    @Test
+    fun `correction depuis le recapitulatif puis retour au recapitulatif`() {
+        start()
+        fillAll()
+        compose.onNodeWithText("Poids").performScrollTo().performClick()
+        compose.waitForIdle()
+        see("Combien pèse Nala ?")
+        next()
+        see("Le profil de Nala")
     }
 
     @Test

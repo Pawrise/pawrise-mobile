@@ -25,8 +25,15 @@ internal fun parseBirthDate(digits: String, today: LocalDate = LocalDate.now()):
     } catch (e: DateTimeException) {
         return BirthDate.Invalid
     }
-    return if (date.isAfter(today) || date.year < 1980) BirthDate.Invalid else BirthDate.Valid(date)
+    return if (date.isAfter(today) || date.isBefore(today.minusYears(MAX_AGE_YEARS))) BirthDate.Invalid else BirthDate.Valid(date)
 }
+
+/** Âge maximal raisonnable (comme iOS) : évite les saisies aberrantes. */
+internal const val MAX_AGE_YEARS = 30L
+
+/** Bornes des mesures (comme iOS). */
+internal const val MAX_WEIGHT_KG = 120.0
+internal const val MAX_HEIGHT_CM = 120.0
 
 internal fun LocalDate.toDigits(): String = "%02d%02d%04d".format(dayOfMonth, monthValue, year)
 
@@ -59,12 +66,15 @@ internal sealed interface Measurement {
     data class Valid(val value: Double) : Measurement
 }
 
-internal fun parseMeasurement(text: String): Measurement {
+internal fun parseMeasurement(text: String, max: Double = Double.MAX_VALUE): Measurement {
     val t = text.trim().replace(',', '.')
     if (t.isEmpty()) return Measurement.Empty
     val value = t.toDoubleOrNull() ?: return Measurement.Invalid
-    return if (value > 0 && value.isFinite()) Measurement.Valid(value) else Measurement.Invalid
+    return if (value > 0 && value <= max && value.isFinite()) Measurement.Valid(value) else Measurement.Invalid
 }
+
+internal fun parseWeight(text: String) = parseMeasurement(text, MAX_WEIGHT_KG)
+internal fun parseHeight(text: String) = parseMeasurement(text, MAX_HEIGHT_CM)
 
 /** Saisie décimale : chiffres et un seul séparateur. */
 internal fun decimalInput(text: String): String {

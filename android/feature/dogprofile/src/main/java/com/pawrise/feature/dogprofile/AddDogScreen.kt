@@ -5,43 +5,25 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.foundation.layout.size
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.semantics.ProgressBarRangeInfo
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.progressBarRangeInfo
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.pawrise.core.designsystem.component.PwFieldError
+import com.pawrise.core.designsystem.component.PwFlowFooter
 import com.pawrise.core.designsystem.component.PwFlowHeader
-import com.pawrise.core.designsystem.component.PwIcons
 import com.pawrise.core.designsystem.component.PwPrimaryButton
+import com.pawrise.core.designsystem.component.PwStepProgress
 import com.pawrise.core.designsystem.theme.PwColors
-import com.pawrise.core.designsystem.theme.PwRadius
-import com.pawrise.core.designsystem.theme.PwSpacing
 import com.pawrise.core.pets.SamplePhoto
 import com.pawrise.core.pets.Sex
 
@@ -102,50 +84,24 @@ internal data class AddDogActions(
     val onEdit: (AddDogStep) -> Unit,
 )
 
+/**
+ * Maquette A08–A16 : en-tête 64 dp (progression 9 × 26 dp), contenu à 16 dp sous l'en-tête et 20 dp des bords,
+ * zone d'action de 80 dp (bouton à 16 dp du bas).
+ */
 @Composable
 internal fun AddDogScreen(state: AddDogUiState, actions: AddDogActions) {
-    Column(Modifier.fillMaxSize().safeDrawingPadding().imePadding()) {
-        PwFlowHeader(onBack = actions.onBack, onClose = actions.onClose) { StepProgress(state.step) }
-        Box(Modifier.weight(1f).padding(horizontal = PwSpacing.Section)) {
-            AddDogStepContent(state, actions)
+    Column(Modifier.fillMaxSize().background(PwColors.SurfacePage).safeDrawingPadding().imePadding()) {
+        PwFlowHeader(onBack = actions.onBack, onClose = actions.onClose) {
+            PwStepProgress(total = AddDogStep.entries.size, current = state.step.ordinal + 1)
         }
-        Column(Modifier.padding(horizontal = PwSpacing.Section, vertical = PwSpacing.Page)) {
-            if (!state.canContinue) {
-                Text(
-                    AddDogMessages.INVALID_VALUE,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(bottom = 8.dp),
-                )
-            }
+        Box(Modifier.weight(1f)) { AddDogStepContent(state, actions) }
+        PwFlowFooter {
             state.saveError?.let { PwFieldError(it, Modifier.padding(bottom = 8.dp)) }
             PwPrimaryButton(
                 text = if (state.step == AddDogStep.Summary) "Continuer" else "Suivant",
                 onClick = actions.onNext,
                 enabled = state.canContinue,
                 loading = state.saving,
-            )
-        }
-    }
-}
-
-/** Barre segmentée (9 étapes). */
-@Composable
-private fun StepProgress(step: AddDogStep) {
-    val total = AddDogStep.entries.size
-    Row(
-        Modifier.fillMaxWidth().semantics {
-            contentDescription = "Étape ${step.ordinal + 1} sur $total"
-            progressBarRangeInfo = ProgressBarRangeInfo((step.ordinal + 1).toFloat(), 0f..total.toFloat(), total)
-        },
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        repeat(total) { i ->
-            Box(
-                Modifier.weight(1f).height(6.dp).background(
-                    if (i <= step.ordinal) PwColors.Action else PwColors.TextPrimary.copy(alpha = 0.15f),
-                    PwRadius.Pill,
-                ),
             )
         }
     }
